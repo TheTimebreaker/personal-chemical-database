@@ -1,0 +1,16 @@
+ast-serialize==0.5.0
+black==26.5.1
+click==8.4.1
+librt==0.11.0
+mypy==2.1.0
+mypy-extensions==1.1.0
+numpy==2.4.6
+packaging==26.2
+pathspec==1.1.1
+pillow==12.2.0
+pip==26.1.2
+platformdirs==4.10.0
+pytokens==0.4.1
+rdkit==2026.3.3
+ruff==0.15.16
+typing-extensions==4.15.0
