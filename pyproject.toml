@@ -5,7 +5,11 @@ description="A personal, self-hosted database format and GUI for organizing your
 authors=[{name="TheTimebreaker"}]
 readme="README.md"
 requires-python=">=3.14"
-dependencies = ["rdkit~=2026.3.3"]
+dependencies = [
+  "rdkit~=2026.3.3",
+  "pubchempy~=1.0.5",
+  "send2trash~=2.1.0"
+]
 
 
 [tool.ruff]
@@ -71,5 +75,5 @@ check_untyped_defs = true
 warn_unused_ignores = true
 warn_return_any = true
 [[tool.mypy.overrides]]
-module = []
+module = ["pubchempy"]
 ignore_missing_imports = true

@@ -10,7 +10,10 @@ pathspec==1.1.1
 pillow==12.2.0
 pip==26.1.2
 platformdirs==4.10.0
+pubchempy==1.0.5
 pytokens==0.4.1
 rdkit==2026.3.3
 ruff==0.15.16
+send2trash==2.1.0
+types-send2trash==2.1.0.20260408
 typing-extensions==4.15.0
