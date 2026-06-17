@@ -3,7 +3,7 @@ import tkinter as tk
 from tkinter import ttk
 from typing import Any, Literal
 
-from database import Database
+from database import Database, Molecule, generate_molecule_data
 
 
 class AddMolecule(ttk.Frame):
@@ -52,15 +52,16 @@ class AddMolecule(ttk.Frame):
         )
         self.parent = parent
         self.root = root
-        self._build_ui()
 
-    def _build_ui(self) -> None:
         self.inchi_var = tk.StringVar()
         self.inchikey_var = tk.StringVar()
         self.smiles_var = tk.StringVar()
         self.cas_var = tk.StringVar()
         self.compound_names_var: list[str] = []
 
+        self._build_ui()
+
+    def _build_ui(self) -> None:
         self.inchi_label = ttk.Label(self, text="InChI")
         self.inchi_entry = ttk.Entry(self, textvariable=self.inchi_var)
         self.inchikey_label = ttk.Label(self, text="InChIKey")
@@ -70,6 +71,7 @@ class AddMolecule(ttk.Frame):
         self.cas_label = ttk.Label(self, text="CAS")
         self.cas_entry = ttk.Entry(self, textvariable=self.cas_var)
         self.names_label = ttk.Label(self, text="Compound name(s)")
+        self.names_entry = ttk.Frame(self)
 
         self.inchi_label.grid(row=0, column=0, sticky="w", padx=self.padx, pady=self.pady)
         self.inchi_entry.grid(row=0, column=1, sticky="ew", padx=self.padx, pady=self.pady)
@@ -79,8 +81,127 @@ class AddMolecule(ttk.Frame):
         self.smiles_entry.grid(row=2, column=1, sticky="ew", padx=self.padx, pady=self.pady)
         self.cas_label.grid(row=3, column=0, sticky="w", padx=self.padx, pady=self.pady)
         self.cas_entry.grid(row=3, column=1, sticky="ew", padx=self.padx, pady=self.pady)
+        self.names_label.grid(row=4, column=0, sticky="nw", padx=self.padx, pady=self.pady)
+        self.names_entry.grid(row=4, column=1, sticky="ew")
 
         self.grid_columnconfigure(1, weight=1)
+
+        self._update_compound_names()
+
+        separator = ttk.Separator(self, orient="horizontal")
+        separator.grid(row=5, column=0, columnspan=2, sticky="ew", padx=self.padx, pady=self.pady)
+
+        action_frame = ttk.Frame(self)
+        action_frame.grid(row=6, column=0, columnspan=2, sticky="e", padx=self.padx, pady=self.pady)
+
+        self.autofill_button = ttk.Button(action_frame, text="Autofill", command=self._autofill)
+        self.confirm_button = ttk.Button(action_frame, text="Confirm", command=self._confirm)
+        self.cancel_button = ttk.Button(action_frame, text="Clear", command=self._clear)
+
+        self.autofill_button.pack(side="left", padx=self.padx, pady=self.pady)
+        self.cancel_button.pack(side="right", padx=self.padx, pady=self.pady)
+        self.confirm_button.pack(side="right", padx=self.padx, pady=self.pady)
+
+    def _update_compound_names(self) -> None:
+        for child in self.names_entry.winfo_children():
+            child.destroy()
+
+        for name in self.compound_names_var:
+            label = ttk.Label(self.names_entry, text=name)
+            label.pack(fill="x", expand=True, padx=self.padx, pady=self.pady)
+
+        button_add_names = ttk.Button(self.names_entry, text="Add name", command=self._open_add_name_dialog)
+        button_add_names.pack(fill="x", expand=True, padx=self.padx, pady=self.pady)
+
+    def _open_add_name_dialog(self) -> None:
+        dialog = tk.Toplevel(self)
+        dialog.title("Add compound name")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        entry_var = tk.StringVar()
+        label = ttk.Label(dialog, text="Compound name:")
+        entry = ttk.Entry(dialog, textvariable=entry_var)
+        button_frame = ttk.Frame(dialog)
+        button_confirm = ttk.Button(button_frame, text="Confirm", command=lambda: self._confirm_add_name(dialog, entry_var))
+        button_cancel = ttk.Button(button_frame, text="Cancel", command=dialog.destroy)
+
+        label.grid(row=0, column=0, sticky="w", padx=self.padx, pady=self.pady)
+        entry.grid(row=0, column=1, sticky="ew", padx=self.padx, pady=self.pady)
+        button_frame.grid(row=1, column=0, columnspan=2, sticky="e", padx=self.padx, pady=self.pady)
+        button_cancel.pack(side="right", padx=self.padx, pady=self.pady)
+        button_confirm.pack(side="right", padx=self.padx, pady=self.pady)
+
+        dialog.grid_columnconfigure(1, weight=1)
+        entry.focus_set()
+        dialog.bind("<Return>", lambda _: self._confirm_add_name(dialog, entry_var))
+
+    def _confirm_add_name(self, dialog: tk.Toplevel, entry_var: tk.StringVar) -> None:
+        value = entry_var.get().strip()
+        if value:
+            self.compound_names_var.append(value)
+            self._update_compound_names()
+        dialog.destroy()
+
+    def _autofill(self) -> None:
+        inchi = self.inchi_var.get()
+        if not inchi:
+            inchi = None
+        inchikey = self.inchikey_var.get()
+        if not inchikey:
+            inchikey = None
+        smiles = self.smiles_var.get()
+        if not smiles:
+            smiles = None
+        cas = self.cas_var.get()
+        if not cas:
+            cas = None
+        names = self.compound_names_var
+        if not names:
+            names = None
+        else:
+            names = names[0]
+
+        molecule = generate_molecule_data(inchi=inchi, inchikey=inchikey, smiles=smiles, cas=cas, compound_name=names)
+        if molecule:
+            if molecule["inchi"]:
+                self.inchi_var.set(molecule["inchi"])
+            if molecule["inchikey"]:
+                self.inchikey_var.set(molecule["inchikey"])
+            if molecule["smiles"]:
+                self.smiles_var.set(molecule["smiles"])
+            if molecule["cas"]:
+                self.cas_var.set(molecule["cas"])
+            if molecule["names"]:
+                self.compound_names_var = molecule["names"]
+
+    def _confirm(self) -> None:
+        inchi = self.inchi_var.get()
+        inchikey = self.inchikey_var.get()
+        smiles = self.smiles_var.get()
+        cas = self.cas_var.get()
+        if not cas:
+            cas = None
+        names = self.compound_names_var
+        if not names:
+            names = None
+
+        if any(not x for x in (inchi, inchikey, smiles)):
+            return
+        molecule = Molecule(inchi=inchi, inchikey=inchikey, smiles=smiles, cas=cas, names=names)
+        if self.parent.database.create_entry(molecule):
+            self._clear()
+        else:
+            pass
+
+    def _clear(self) -> None:
+        self.inchi_var = tk.StringVar()
+        self.inchikey_var = tk.StringVar()
+        self.smiles_var = tk.StringVar()
+        self.cas_var = tk.StringVar()
+        self.compound_names_var: list[str] = []
+
+        self._build_ui()
 
 
 class Search(ttk.Frame):
