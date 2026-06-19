@@ -77,27 +77,29 @@ class Database:
             return False
 
         molecule_uuid = str(uuid_module.uuid4())
+        self.write_metadata_file(uuid=molecule_uuid, molecule=molecule)
+        return True
+
+    def overwrite_entry(self, molecule_uuid: str, molecule: Molecule) -> bool:
+        if not self.is_this_in_db(uuid=molecule_uuid):
+            logging.error("Molecule is not in database (and therefore can't be overwritten).")
+            return False
 
         self.write_metadata_file(uuid=molecule_uuid, molecule=molecule)
+        return True
 
     def delete_entry(
         self,
         uuid: str | None = None,
     ) -> bool:
 
-        print(f"Found in database: {self.by_uuid[uuid]}")
-        confirmation = str(input("Are you sure to delete that? y(es) / n(o) :"))
-        if any(confirmation == x for x in ("yes", " yes", "yes ", " yes ", "y", " y", "y ", " y ")):
-            print("Deleting molecule from database...")
-            deletion_path = self.molecules_path / uuid
-            if not deletion_path.is_dir():
-                raise FileNotFoundError("Could not delete molecule %s from db, because the path %s could not be found.", uuid, deletion_path)
-            send2trash(deletion_path)
-            print("Deleting molecule from database... Done!")
-            return True
-        else:
-            print("Deletion aborted...")
-            return False
+        print("Deleting molecule from database...")
+        deletion_path = self.molecules_path / uuid
+        if not deletion_path.is_dir():
+            raise FileNotFoundError("Could not delete molecule %s from db, because the path %s could not be found.", uuid, deletion_path)
+        send2trash(deletion_path)
+        print("Deleting molecule from database... Done!")
+        return True
 
     def add_entry_names(
         self,
@@ -281,3 +283,11 @@ def pubchemsearchselection(compounds: list[pubchempy.Compound]) -> pubchempy.Com
 
     else:
         raise ValueError("The given InChI Key could not be found in PubChem.")
+
+
+def get_display_name(molecule: Molecule) -> str:
+    if molecule["names"]:
+        return molecule["names"][0]
+    if molecule["cas"]:
+        return molecule["cas"]
+    return molecule["inchi"]

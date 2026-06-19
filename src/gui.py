@@ -1,9 +1,9 @@
 import logging
 import tkinter as tk
-from tkinter import ttk
+from tkinter import messagebox, ttk
 from typing import Any, Literal
 
-from database import Database, Molecule, generate_molecule_data
+from database import Database, Molecule, generate_molecule_data, get_display_name
 
 
 class AddMolecule(ttk.Frame):
@@ -52,16 +52,21 @@ class AddMolecule(ttk.Frame):
         )
         self.parent = parent
         self.root = root
+        self.previous_tab = None
 
         self.inchi_var = tk.StringVar()
         self.inchikey_var = tk.StringVar()
         self.smiles_var = tk.StringVar()
         self.cas_var = tk.StringVar()
+        self.molecule_uuid_var: str | None = None
         self.compound_names_var: list[str] = []
 
         self._build_ui()
 
     def _build_ui(self) -> None:
+        for child in self.winfo_children():
+            child.destroy()
+
         self.inchi_label = ttk.Label(self, text="InChI")
         self.inchi_entry = ttk.Entry(self, textvariable=self.inchi_var)
         self.inchikey_label = ttk.Label(self, text="InChIKey")
@@ -96,19 +101,26 @@ class AddMolecule(ttk.Frame):
 
         self.autofill_button = ttk.Button(action_frame, text="Autofill", command=self._autofill)
         self.confirm_button = ttk.Button(action_frame, text="Confirm", command=self._confirm)
-        self.cancel_button = ttk.Button(action_frame, text="Clear", command=self._clear)
+        self.clear_button = ttk.Button(action_frame, text="Clear", command=self._clear)
 
         self.autofill_button.pack(side="left", padx=self.padx, pady=self.pady)
-        self.cancel_button.pack(side="right", padx=self.padx, pady=self.pady)
+        self.clear_button.pack(side="right", padx=self.padx, pady=self.pady)
         self.confirm_button.pack(side="right", padx=self.padx, pady=self.pady)
 
     def _update_compound_names(self) -> None:
         for child in self.names_entry.winfo_children():
             child.destroy()
 
-        for name in self.compound_names_var:
-            label = ttk.Label(self.names_entry, text=name)
-            label.pack(fill="x", expand=True, padx=self.padx, pady=self.pady)
+        frame = ttk.Frame(self.names_entry)
+        frame.pack(fill="x", expand=True)
+        frame.columnconfigure(0, weight=1)
+        for i, name in enumerate(self.compound_names_var):
+            ttk.Label(frame, text=name).grid(row=i, column=0, sticky="ew", padx=self.padx, pady=self.pady)
+            ttk.Button(
+                frame,
+                text="Delete",
+                command=lambda name=name: self._remove_this_name(name),
+            ).grid(row=i, column=1, padx=self.padx, pady=0)
 
         button_add_names = ttk.Button(self.names_entry, text="Add name", command=self._open_add_name_dialog)
         button_add_names.pack(fill="x", expand=True, padx=self.padx, pady=self.pady)
@@ -136,6 +148,16 @@ class AddMolecule(ttk.Frame):
         entry.focus_set()
         dialog.bind("<Return>", lambda _: self._confirm_add_name(dialog, entry_var))
 
+    def _remove_this_name(self, name: str) -> None:
+        try:
+            self.compound_names_var.remove(name)
+        except ValueError:
+            messagebox.showerror(
+                title="How did we get here?",
+                message="I do not understand how this is possible, but the name you are trying to delete is not in the name list anymore.",
+            )
+        self._update_compound_names()
+
     def _confirm_add_name(self, dialog: tk.Toplevel, entry_var: tk.StringVar) -> None:
         value = entry_var.get().strip()
         if value:
@@ -162,7 +184,16 @@ class AddMolecule(ttk.Frame):
         else:
             names = names[0]
 
-        molecule = generate_molecule_data(inchi=inchi, inchikey=inchikey, smiles=smiles, cas=cas, compound_name=names)
+        try:
+            molecule = generate_molecule_data(inchi=inchi, inchikey=inchikey, smiles=smiles, cas=cas, compound_name=names)
+        except ValueError:
+            messagebox.showerror(
+                title="Autofill not successfull",
+                message="Autofilling was not successfull from the entered values. Make sure to give atleast one of the above values and if you did "
+                "and it still failed, enter a value for another field.",
+            )
+            return
+
         if molecule:
             if molecule["inchi"]:
                 self.inchi_var.set(molecule["inchi"])
@@ -185,14 +216,23 @@ class AddMolecule(ttk.Frame):
         names = self.compound_names_var
         if not names:
             names = None
-
         if any(not x for x in (inchi, inchikey, smiles)):
             return
         molecule = Molecule(inchi=inchi, inchikey=inchikey, smiles=smiles, cas=cas, names=names)
+
+        if self.parent.database.is_this_in_db(molecule=molecule):
+            messagebox.showerror(title="Adding molecule not successfull", message="This molecule is a duplicate and already exists in the database.")
+            return
+
         if self.parent.database.create_entry(molecule):
             self._clear()
+            self.parent.database.__init__()
+            self.parent.browse_tab._build_ui()
+            self._build_ui()
         else:
-            pass
+            messagebox.showerror(
+                title="Adding molecule not successfull", message="The molecule could not be added successfully for an unknown reason."
+            )
 
     def _clear(self) -> None:
         self.inchi_var = tk.StringVar()
@@ -202,6 +242,49 @@ class AddMolecule(ttk.Frame):
         self.compound_names_var: list[str] = []
 
         self._build_ui()
+        if self.previous_tab is not None:
+            self.parent.notebook.select(self.previous_tab)
+
+
+class EditMolecule(AddMolecule):
+    def _build_ui(self) -> None:
+        super()._build_ui()
+        self.autofill_button.pack_forget()
+        self.clear_button.configure(text="Cancel")
+
+    def _confirm(self) -> None:
+        inchi = self.inchi_var.get()
+        inchikey = self.inchikey_var.get()
+        smiles = self.smiles_var.get()
+        cas = self.cas_var.get()
+        if not cas:
+            cas = None
+        names = self.compound_names_var
+        if not names:
+            names = None
+
+        molecule_uuid = self.molecule_uuid_var
+        if not molecule_uuid:
+            logging.error("Could not commit EDITs, molecule UUID was not assigned.")
+            return  # ERROR
+
+        if any(not x for x in (inchi, inchikey, smiles)):
+            logging.error("Could not commit EDITs, atleast one required value was empty.")
+            return
+        molecule = Molecule(inchi=inchi, inchikey=inchikey, smiles=smiles, cas=cas, names=names)
+
+        if self.parent.database.overwrite_entry(molecule_uuid=molecule_uuid, molecule=molecule):
+            self._clear()
+            self.parent.database.__init__()
+            self.parent.browse_tab._build_ui()
+        else:
+            messagebox.showerror(
+                title="Adding molecule not successfull", message="The molecule could not be added successfully for an unknown reason."
+            )
+
+    def _clear(self) -> None:
+        super()._clear()
+        self.parent._toggle_edit_off()
 
 
 class Search(ttk.Frame):
@@ -304,9 +387,65 @@ class Browse(ttk.Frame):
         self._build_ui()
 
     def _build_ui(self) -> None:
-        for molecule_uuid, molecule in self.parent.database.by_uuid.items():
+        self.columnconfigure(0, weight=1)
+        for child in self.winfo_children():
+            child.destroy()
+
+        for i, (molecule_uuid, molecule) in enumerate(self.parent.database.by_uuid.items()):
             print(molecule_uuid, molecule)
-        # TODO(TheTimebreaker): do this later when the database exists again lol
+            ttk.Label(self, text=get_display_name(molecule)).grid(row=i, column=0, padx=self.padx, pady=self.pady, sticky="ew")
+            ttk.Button(
+                self,
+                text="Edit",
+                command=lambda molecule_uuid=molecule_uuid: self._edit(molecule_uuid),
+            ).grid(row=i, column=1, padx=self.padx, pady=self.pady)
+            ttk.Button(
+                self,
+                text="Delete",
+                command=lambda molecule_uuid=molecule_uuid: self._delete(molecule_uuid),
+            ).grid(row=i, column=2, padx=self.padx, pady=self.pady)
+
+    def _edit(self, molecule_uuid: str) -> None:
+        print(molecule_uuid)
+        molecule = self.parent.database.by_uuid[molecule_uuid]
+        self.parent.edit_molecule._clear()  # Clear potential leftovers, so we dont get crossovers
+
+        self.parent.edit_molecule.inchi_var.set(molecule["inchi"])
+        self.parent.edit_molecule.inchikey_var.set(molecule["inchikey"])
+        self.parent.edit_molecule.smiles_var.set(molecule["smiles"])
+        if molecule.get("cas", None):
+            self.parent.edit_molecule.cas_var.set(molecule.get("cas", None))
+        if molecule.get("names", None):
+            self.parent.edit_molecule.compound_names_var = molecule["names"]
+        self.parent.edit_molecule.molecule_uuid_var = molecule_uuid
+        self.parent.edit_molecule.previous_tab = self.parent.browse_tab
+
+        self.parent._toggle_edit_on()
+        self.parent.edit_molecule._update_compound_names()
+        self.parent.notebook.select(self.parent.edit_molecule)
+
+    def _delete(self, molecule_uuid: str) -> None:
+        print(molecule_uuid)
+        if not self.parent.database.is_this_in_db(uuid=molecule_uuid):
+            messagebox.showerror(
+                title="Can't delete what doesn't exist",
+                message=f"Cannot delete selected molecule {molecule_uuid} because it isn't in the database.",
+            )
+            return
+
+        if not messagebox.askyesno(
+            title="Are you sure?",
+            message=f"Are you sure you want to delete this molecule:\n - {molecule_uuid}\n - {self.parent.database.by_uuid[molecule_uuid]}",
+        ):
+            return
+
+        if not self.parent.database.delete_entry(uuid=molecule_uuid):
+            messagebox.showerror(
+                title="Deletion unsuccessful",
+                message=f"Could not delete molecule {molecule_uuid} due to an unknown error.",
+            )
+        self.parent.database.__init__()
+        self._build_ui()
 
 
 class GUI(tk.Tk):
@@ -320,18 +459,28 @@ class GUI(tk.Tk):
 
         self.database = Database()
 
+        self.notebook = ttk.Notebook(self.root)
+        self.add_molecule = AddMolecule(self.notebook, parent=self, root=self.root)
+        self.edit_molecule = EditMolecule(self.notebook, parent=self, root=self.root)
+        self.browse_tab = Browse(self.notebook, parent=self, root=self.root)
+        self.search_tab = Search(self.notebook, parent=self, root=self.root)
+
         self._build_ui()
 
     def _build_ui(self) -> None:
-        self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill="both", expand=True)
-        self.add_molecule = AddMolecule(self.notebook, parent=self, root=self.root)
         self.notebook.add(self.add_molecule, text="Add Molecule")
-        self.browse_tab = Browse(self.notebook, parent=self, root=self.root)
         self.notebook.add(self.browse_tab, text="Browse")
-
-        self.search_tab = Search(self.notebook, parent=self, root=self.root)
         self.notebook.add(self.search_tab, text="Search")
+
+    def _toggle_edit_on(self) -> None:
+        self.notebook.add(self.edit_molecule, text="Edit Molecule")
+
+    def _toggle_edit_off(self) -> None:
+        try:
+            self.notebook.hide(self.edit_molecule)
+        except tk.TclError:
+            pass
 
 
 if __name__ == "__main__":
