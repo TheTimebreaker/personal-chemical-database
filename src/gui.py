@@ -3,7 +3,9 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 from typing import Any, Literal
 
-from database import Database, Molecule, generate_molecule_data, get_display_name
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+from database import Database, Molecule, MoleculeData, generate_molecule_data, get_display_name
 
 
 class AddMolecule(ttk.Frame):
@@ -60,6 +62,7 @@ class AddMolecule(ttk.Frame):
         self.cas_var = tk.StringVar()
         self.molecule_uuid_var: str | None = None
         self.compound_names_var: list[str] = []
+        self.data_var: list[MoleculeData] = []
 
         self._build_ui()
 
@@ -77,6 +80,8 @@ class AddMolecule(ttk.Frame):
         self.cas_entry = ttk.Entry(self, textvariable=self.cas_var)
         self.names_label = ttk.Label(self, text="Compound name(s)")
         self.names_entry = ttk.Frame(self)
+        self.data_label = ttk.Label(self, text="Additional data")
+        self.data_entry = ttk.Frame(self)
 
         self.inchi_label.grid(row=0, column=0, sticky="w", padx=self.padx, pady=self.pady)
         self.inchi_entry.grid(row=0, column=1, sticky="ew", padx=self.padx, pady=self.pady)
@@ -88,16 +93,21 @@ class AddMolecule(ttk.Frame):
         self.cas_entry.grid(row=3, column=1, sticky="ew", padx=self.padx, pady=self.pady)
         self.names_label.grid(row=4, column=0, sticky="nw", padx=self.padx, pady=self.pady)
         self.names_entry.grid(row=4, column=1, sticky="ew")
+        self.data_label.grid(row=5, column=0, sticky="nw", padx=self.padx, pady=self.pady)
+        self.data_entry.grid(row=5, column=1, sticky="ew")
 
         self.grid_columnconfigure(1, weight=1)
 
         self._update_compound_names()
+        self._update_data()
+
+        # --- OK buttons
 
         separator = ttk.Separator(self, orient="horizontal")
-        separator.grid(row=5, column=0, columnspan=2, sticky="ew", padx=self.padx, pady=self.pady)
+        separator.grid(row=6, column=0, columnspan=2, sticky="ew", padx=self.padx, pady=self.pady)
 
         action_frame = ttk.Frame(self)
-        action_frame.grid(row=6, column=0, columnspan=2, sticky="e", padx=self.padx, pady=self.pady)
+        action_frame.grid(row=7, column=0, columnspan=2, sticky="e", padx=self.padx, pady=self.pady)
 
         self.autofill_button = ttk.Button(action_frame, text="Autofill", command=self._autofill)
         self.confirm_button = ttk.Button(action_frame, text="Confirm", command=self._confirm)
@@ -125,6 +135,24 @@ class AddMolecule(ttk.Frame):
         button_add_names = ttk.Button(self.names_entry, text="Add name", command=self._open_add_name_dialog)
         button_add_names.pack(fill="x", expand=True, padx=self.padx, pady=self.pady)
 
+    def _update_data(self) -> None:
+        for child in self.data_entry.winfo_children():
+            child.destroy()
+
+        frame = ttk.Frame(self.data_entry)
+        frame.pack(fill="x", expand=True)
+        frame.columnconfigure(0, weight=1)
+        for i, data in enumerate(self.data_var):
+            ttk.Label(frame, text=f"#{i}-{data["data_type"]}").grid(row=i, column=0, sticky="ew", padx=self.padx, pady=self.pady)
+            ttk.Button(
+                frame,
+                text="Delete",
+                command=lambda data=data: self._remove_this_data(data),
+            ).grid(row=i, column=1, padx=self.padx, pady=0)
+
+        button_add_data = ttk.Button(self.data_entry, text="Add data", command=self._open_add_data_dialog)
+        button_add_data.pack(fill="x", expand=True, padx=self.padx, pady=self.pady)
+
     def _open_add_name_dialog(self) -> None:
         dialog = tk.Toplevel(self)
         dialog.title("Add compound name")
@@ -148,6 +176,47 @@ class AddMolecule(ttk.Frame):
         entry.focus_set()
         dialog.bind("<Return>", lambda _: self._confirm_add_name(dialog, entry_var))
 
+    def _open_add_data_dialog(self) -> None:
+        dialog = tk.Toplevel(self)
+        dialog.title("Add a data entry")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        type_var = tk.StringVar()
+        data_var = tk.StringVar()
+        source_var = tk.StringVar()
+
+        label1 = ttk.Label(dialog, text="Data type:")
+        entry1 = ttk.Combobox(
+            dialog,
+            textvariable=type_var,
+            values=["1H NMR", "13C NMR", "19F NMR", "31P NMR", "IR", "Mass", "boiling point", "melting point", "color"],
+            state="readonly",
+        )
+
+        label2 = ttk.Label(dialog, text="Data:")
+        entry2 = ttk.Entry(dialog, textvariable=data_var)
+
+        label3 = ttk.Label(dialog, text="Source:")
+        entry3 = ttk.Entry(dialog, textvariable=source_var)
+
+        button_frame = ttk.Frame(dialog)
+        button_confirm = ttk.Button(button_frame, text="Confirm", command=lambda: self._confirm_add_data(dialog, type_var, data_var, source_var))
+        button_cancel = ttk.Button(button_frame, text="Cancel", command=dialog.destroy)
+
+        label1.grid(row=0, column=0, sticky="w", padx=self.padx, pady=self.pady)
+        entry1.grid(row=0, column=1, sticky="ew", padx=self.padx, pady=self.pady)
+        label2.grid(row=1, column=0, sticky="w", padx=self.padx, pady=self.pady)
+        entry2.grid(row=1, column=1, sticky="ew", padx=self.padx, pady=self.pady)
+        label3.grid(row=2, column=0, sticky="w", padx=self.padx, pady=self.pady)
+        entry3.grid(row=2, column=1, sticky="ew", padx=self.padx, pady=self.pady)
+        button_frame.grid(row=4, column=0, columnspan=2, sticky="e", padx=self.padx, pady=self.pady)
+        button_cancel.pack(side="right", padx=self.padx, pady=self.pady)
+        button_confirm.pack(side="right", padx=self.padx, pady=self.pady)
+
+        dialog.grid_columnconfigure(1, weight=1)
+        dialog.bind("<Return>", lambda _: self._confirm_add_data(dialog, type_var, data_var, source_var))
+
     def _remove_this_name(self, name: str) -> None:
         try:
             self.compound_names_var.remove(name)
@@ -158,12 +227,37 @@ class AddMolecule(ttk.Frame):
             )
         self._update_compound_names()
 
+    def _remove_this_data(self, data: MoleculeData) -> None:
+        try:
+            self.data_var.remove(data)
+        except ValueError:
+            messagebox.showerror(
+                title="How did we get here?",
+                message="I do not understand how this is possible, but the name you are trying to delete is not in the data list anymore.",
+            )
+        self._update_data()
+
     def _confirm_add_name(self, dialog: tk.Toplevel, entry_var: tk.StringVar) -> None:
         value = entry_var.get().strip()
         if value:
             self.compound_names_var.append(value)
             self._update_compound_names()
-        dialog.destroy()
+            dialog.destroy()
+        else:
+            messagebox.showerror(
+                title="Invalid entry", message="The field was detected as being empty, which is disallowed (and would not make any sense)."
+            )
+
+    def _confirm_add_data(self, dialog: tk.Toplevel, type_var: tk.StringVar, data_var: tk.StringVar, source_var: tk.StringVar) -> None:
+        type_value = type_var.get().strip()
+        data_value = data_var.get().strip()
+        source_value = source_var.get().strip()
+        if type_value and data_value and source_value:
+            self.data_var.append(MoleculeData(data_type=type_value, data=data_value, source=source_value))
+            self._update_data()
+            dialog.destroy()
+        else:
+            messagebox.showerror(title="Invalid entry", message="Some values were detected as being empty, which is disallowed.")
 
     def _autofill(self) -> None:
         inchi = self.inchi_var.get()
@@ -225,8 +319,14 @@ class AddMolecule(ttk.Frame):
             return
 
         if self.parent.database.create_entry(molecule):
-            self._clear()
             self.parent.database.__init__()
+
+            molecule_uuid = self.parent.database.by_inchi[inchi]
+            for el in self.data_var:
+                self.parent.database.add_more_data(molecule_uuid, data=el)
+
+            self._clear()
+
             self.parent.browse_tab._build_ui()
             self._build_ui()
         else:
@@ -239,7 +339,8 @@ class AddMolecule(ttk.Frame):
         self.inchikey_var = tk.StringVar()
         self.smiles_var = tk.StringVar()
         self.cas_var = tk.StringVar()
-        self.compound_names_var: list[str] = []
+        self.compound_names_var = []
+        self.data_var = []
 
         self._build_ui()
         if self.previous_tab is not None:
@@ -274,8 +375,12 @@ class EditMolecule(AddMolecule):
         molecule = Molecule(inchi=inchi, inchikey=inchikey, smiles=smiles, cas=cas, names=names)
 
         if self.parent.database.overwrite_entry(molecule_uuid=molecule_uuid, molecule=molecule):
-            self._clear()
             self.parent.database.__init__()
+
+            for el in self.data_var:
+                self.parent.database.add_more_data(molecule_uuid, data=el)
+
+            self._clear()
             self.parent.browse_tab._build_ui()
         else:
             messagebox.showerror(

@@ -191,20 +191,9 @@ class Database:
             data_uuid = data_uuid_path.stem
             print(i, data_uuid, self.read_more_data(molecule_uuid, data_uuid))
 
-    def add_more_data(self, molecule_uuid: str) -> None:
+    def add_more_data(self, molecule_uuid: str, data: MoleculeData) -> None:
         data_uuid = uuid_module.uuid4()
-
-        choices_datatype = ["1H NMR", "13C NMR", "19F NMR", "31P NMR", "IR", "Mass", "boiling point", "melting point", "color"]
-        choices_string = ", ".join(f"[{i}] {v}" for i, v in enumerate(choices_datatype))
-        choice_datatype = int(input(f"Enter datatype from selection ({choices_string}): "))
-
-        data = input("Please paste value: ")
-
-        source = input("Please enter source for data (either DOI if literature or measurement name if self-measured): ")
-
-        result = MoleculeData(data_type=choices_datatype[choice_datatype], data=data, source=source)
-        print(result)
-        self.write_more_data(molecule_uuid, data_uuid, result)
+        self.write_more_data(molecule_uuid, data_uuid, data)
 
     def read_more_data(self, molecule_uuid: str, data_uuid: str) -> MoleculeData:
         file_path = self.molecules_path / molecule_uuid / "data" / f"{data_uuid}.json"
