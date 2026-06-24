@@ -12,6 +12,9 @@ class AddMolecule(ttk.Frame):
     padx = 5
     pady = 5
 
+    edit_state: Literal["normal", "readonly"] = "normal"
+    viewer_mode: bool = False
+
     def __init__(
         self,
         master: ttk.Notebook | None = None,
@@ -71,13 +74,13 @@ class AddMolecule(ttk.Frame):
             child.destroy()
 
         self.inchi_label = ttk.Label(self, text="InChI")
-        self.inchi_entry = ttk.Entry(self, textvariable=self.inchi_var)
+        self.inchi_entry = ttk.Entry(self, textvariable=self.inchi_var, state=self.edit_state)
         self.inchikey_label = ttk.Label(self, text="InChIKey")
-        self.inchikey_entry = ttk.Entry(self, textvariable=self.inchikey_var)
+        self.inchikey_entry = ttk.Entry(self, textvariable=self.inchikey_var, state=self.edit_state)
         self.smiles_label = ttk.Label(self, text="SMILES")
-        self.smiles_entry = ttk.Entry(self, textvariable=self.smiles_var)
+        self.smiles_entry = ttk.Entry(self, textvariable=self.smiles_var, state=self.edit_state)
         self.cas_label = ttk.Label(self, text="CAS")
-        self.cas_entry = ttk.Entry(self, textvariable=self.cas_var)
+        self.cas_entry = ttk.Entry(self, textvariable=self.cas_var, state=self.edit_state)
         self.names_label = ttk.Label(self, text="Compound name(s)")
         self.names_entry = ttk.Frame(self)
         self.data_label = ttk.Label(self, text="Additional data")
@@ -126,14 +129,16 @@ class AddMolecule(ttk.Frame):
         frame.columnconfigure(0, weight=1)
         for i, name in enumerate(self.compound_names_var):
             ttk.Label(frame, text=name).grid(row=i, column=0, sticky="ew", padx=self.padx, pady=self.pady)
-            ttk.Button(
-                frame,
-                text="Delete",
-                command=lambda name=name: self._remove_this_name(name),
-            ).grid(row=i, column=1, padx=self.padx, pady=0)
+            if not self.viewer_mode:
+                ttk.Button(
+                    frame,
+                    text="Delete",
+                    command=lambda name=name: self._remove_this_name(name),
+                ).grid(row=i, column=1, padx=self.padx, pady=0)
 
-        button_add_names = ttk.Button(self.names_entry, text="Add name", command=self._open_add_name_dialog)
-        button_add_names.pack(fill="x", expand=True, padx=self.padx, pady=self.pady)
+        if not self.viewer_mode:
+            button_add_names = ttk.Button(self.names_entry, text="Add name", command=self._open_add_name_dialog)
+            button_add_names.pack(fill="x", expand=True, padx=self.padx, pady=self.pady)
 
     def _update_data(self) -> None:
         for child in self.data_entry.winfo_children():
@@ -144,14 +149,16 @@ class AddMolecule(ttk.Frame):
         frame.columnconfigure(0, weight=1)
         for i, data in enumerate(self.data_var):
             ttk.Label(frame, text=f"#{i}-{data["data_type"]}").grid(row=i, column=0, sticky="ew", padx=self.padx, pady=self.pady)
-            ttk.Button(
-                frame,
-                text="Delete",
-                command=lambda data=data: self._remove_this_data(data),
-            ).grid(row=i, column=1, padx=self.padx, pady=0)
+            if not self.viewer_mode:
+                ttk.Button(
+                    frame,
+                    text="Delete",
+                    command=lambda data=data: self._remove_this_data(data),
+                ).grid(row=i, column=1, padx=self.padx, pady=0)
 
-        button_add_data = ttk.Button(self.data_entry, text="Add data", command=self._open_add_data_dialog)
-        button_add_data.pack(fill="x", expand=True, padx=self.padx, pady=self.pady)
+        if not self.viewer_mode:
+            button_add_data = ttk.Button(self.data_entry, text="Add data", command=self._open_add_data_dialog)
+            button_add_data.pack(fill="x", expand=True, padx=self.padx, pady=self.pady)
 
     def _open_add_name_dialog(self) -> None:
         dialog = tk.Toplevel(self)
@@ -392,6 +399,21 @@ class EditMolecule(AddMolecule):
         self.parent._toggle_edit_off()
 
 
+class View(AddMolecule):
+    edit_state = "readonly"
+    viewer_mode = True
+
+    def _build_ui(self) -> None:
+        super()._build_ui()
+        self.autofill_button.pack_forget()
+        self.confirm_button.pack_forget()
+        self.clear_button.configure(text="Exit Viewer")
+
+    def _clear(self) -> None:
+        super()._clear()
+        self.parent._toggle_view_off()
+
+
 class Search(ttk.Frame):
     padx = 5
     pady = 5
@@ -501,14 +523,38 @@ class Browse(ttk.Frame):
             ttk.Label(self, text=get_display_name(molecule)).grid(row=i, column=0, padx=self.padx, pady=self.pady, sticky="ew")
             ttk.Button(
                 self,
+                text="View",
+                command=lambda molecule_uuid=molecule_uuid: self._view(molecule_uuid),
+            ).grid(row=i, column=1, padx=self.padx, pady=self.pady)
+            ttk.Button(
+                self,
                 text="Edit",
                 command=lambda molecule_uuid=molecule_uuid: self._edit(molecule_uuid),
-            ).grid(row=i, column=1, padx=self.padx, pady=self.pady)
+            ).grid(row=i, column=2, padx=self.padx, pady=self.pady)
             ttk.Button(
                 self,
                 text="Delete",
                 command=lambda molecule_uuid=molecule_uuid: self._delete(molecule_uuid),
-            ).grid(row=i, column=2, padx=self.padx, pady=self.pady)
+            ).grid(row=i, column=3, padx=self.padx, pady=self.pady)
+
+    def _view(self, molecule_uuid: str) -> None:
+        print(molecule_uuid)
+        molecule = self.parent.database.by_uuid[molecule_uuid]
+        self.parent.view_tab._clear()  # Clear potential leftovers, so we dont get crossovers
+
+        self.parent.view_tab.inchi_var.set(molecule["inchi"])
+        self.parent.view_tab.inchikey_var.set(molecule["inchikey"])
+        self.parent.view_tab.smiles_var.set(molecule["smiles"])
+        if molecule.get("cas", None):
+            self.parent.view_tab.cas_var.set(molecule.get("cas", None))
+        if molecule.get("names", None):
+            self.parent.view_tab.compound_names_var = molecule["names"]
+        self.parent.view_tab.molecule_uuid_var = molecule_uuid
+        self.parent.view_tab.previous_tab = self.parent.browse_tab
+
+        self.parent._toggle_view_on()
+        self.parent.view_tab._update_compound_names()
+        self.parent.notebook.select(self.parent.view_tab)
 
     def _edit(self, molecule_uuid: str) -> None:
         print(molecule_uuid)
@@ -569,6 +615,7 @@ class GUI(tk.Tk):
         self.edit_molecule = EditMolecule(self.notebook, parent=self, root=self.root)
         self.browse_tab = Browse(self.notebook, parent=self, root=self.root)
         self.search_tab = Search(self.notebook, parent=self, root=self.root)
+        self.view_tab = View(self.notebook, parent=self, root=self.root)
 
         self._build_ui()
 
@@ -584,6 +631,15 @@ class GUI(tk.Tk):
     def _toggle_edit_off(self) -> None:
         try:
             self.notebook.hide(self.edit_molecule)
+        except tk.TclError:
+            pass
+
+    def _toggle_view_on(self) -> None:
+        self.notebook.add(self.view_tab, text="View Molecule")
+
+    def _toggle_view_off(self) -> None:
+        try:
+            self.notebook.hide(self.view_tab)
         except tk.TclError:
             pass
 
