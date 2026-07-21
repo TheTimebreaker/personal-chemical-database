@@ -6,6 +6,7 @@ from typing import Any, Literal
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 from database import Database, Molecule, MoleculeData, generate_molecule_data, get_display_name
+from style import configure_ttk_style
 
 
 class AddMolecule(ttk.Frame):
@@ -752,8 +753,6 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
     root = tk.Tk()
-    style = ttk.Style()
-    style.configure("Red.TLabel", foreground="red")
-    style.configure("Green.TLabel", foreground="green")
+    configure_ttk_style()
     g = GUI(root)
     tk.mainloop()
