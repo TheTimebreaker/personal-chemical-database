@@ -441,12 +441,12 @@ class AddMolecule(ttk.Frame):
             molecule_uuid = self.parent.database.by_inchi[inchi]
             existing_data_uuids = self.parent.database.get_data_uuids(molecule_uuid)
             for data_uuid, data in self.data_var.items():
-                molecule_has_no_data = existing_data_uuids is None
+                molecule_has_data = bool(existing_data_uuids)
                 data_exists = data_uuid in existing_data_uuids
                 data_was_deleted = data_uuid in self._deleted_data
                 if data_was_deleted:
                     self.parent.database.delete_data(molecule_uuid=molecule_uuid, data_uuid=data_uuid)
-                elif molecule_has_no_data or not data_exists:
+                elif not molecule_has_data or not data_exists:
                     self.parent.database.add_data(molecule_uuid, data=data, data_uuid=data_uuid)
 
             self._clear()
@@ -508,13 +508,13 @@ class EditMolecule(AddMolecule):
 
             existing_data_uuids = self.parent.database.get_data_uuids(molecule_uuid)
             for data_uuid, data in self.data_var.items():
-                molecule_has_no_data = existing_data_uuids is None
+                molecule_has_data = bool(existing_data_uuids)
                 data_exists = data_uuid in existing_data_uuids
                 data_was_deleted = data_uuid in self._deleted_data
                 print(data_uuid, self._deleted_data, data_was_deleted)
                 if data_was_deleted:
                     self.parent.database.delete_data(molecule_uuid=molecule_uuid, data_uuid=data_uuid)
-                elif molecule_has_no_data or not data_exists:
+                elif not molecule_has_data or not data_exists:
                     logging.info("committing new data for molecule %s datauuid %s to database: %s", molecule_uuid, data_uuid, data)
                     self.parent.database.add_data(molecule_uuid, data=data, data_uuid=data_uuid)
 

@@ -187,16 +187,14 @@ class Database:
                 for name in molecule["names"]:
                     self.by_name[name] = uuid
 
-    def get_data_uuids(self, molecule_uuid: str) -> list[str] | None:
+    def get_data_uuids(self, molecule_uuid: str) -> list[str]:
         molecule_data_path = self.molecules_path / molecule_uuid / "data"
         molecule_data_path.mkdir(parents=True, exist_ok=True)
         out = []
         for data_uuid_path in molecule_data_path.iterdir():
             data_uuid = data_uuid_path.stem
             out.append(data_uuid)
-        if out:
-            return out
-        return None
+        return out
 
     def add_data(self, molecule_uuid: str, data: MoleculeData, *, data_uuid: str | None = None) -> None:
         if data_uuid is None:
