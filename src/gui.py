@@ -65,8 +65,10 @@ class AddMolecule(ttk.Frame):
         self.cas_var = tk.StringVar()
         self.molecule_uuid_var: str | None = None
         self.compound_names_var: list[str] = []
+        self._new_compound_names: list[str] = []
         self._deleted_compound_names: list[str] = []  # unused in here, but used in descendants
         self.data_var: dict[str, MoleculeData] = {}
+        self._new_data: list[str] = []
         self._deleted_data: list[str] = []  # unused in here, but used in descendants
 
         self._build_ui()
@@ -151,8 +153,11 @@ class AddMolecule(ttk.Frame):
         frame.columnconfigure(0, weight=1)
         for i, name in enumerate(self.compound_names_var):
             marked_for_deletion = name in self._deleted_compound_names
+            marked_as_new = name in self._new_compound_names
             if marked_for_deletion:
                 styl = "Red.TLabel"
+            elif marked_as_new:
+                styl = "Green.TLabel"
             else:
                 styl = ""
 
@@ -185,8 +190,11 @@ class AddMolecule(ttk.Frame):
         frame.columnconfigure(0, weight=1)
         for i, (data_uuid, data) in enumerate(self.data_var.items()):
             marked_for_deletion = data_uuid in self._deleted_data
+            marked_as_new = data_uuid in self._new_data
             if marked_for_deletion:
                 styl = "Red.TLabel"
+            elif marked_as_new:
+                styl = "Green.TLabel"
             else:
                 styl = ""
 
@@ -345,6 +353,7 @@ class AddMolecule(ttk.Frame):
         value = entry_var.get().strip()
         if value:
             self.compound_names_var.append(value)
+            self._new_compound_names.append(value)
             self._update_compound_names()
             dialog.destroy()
         else:
@@ -359,6 +368,7 @@ class AddMolecule(ttk.Frame):
         if type_value and data_value and source_value:
             new_data_uuid = self.parent.database._gen_uuid()
             self.data_var[new_data_uuid] = MoleculeData(data_type=type_value, data=data_value, source=source_value)
+            self._new_data.append(new_data_uuid)
             self._update_data()
             dialog.destroy()
         else:
@@ -453,8 +463,10 @@ class AddMolecule(ttk.Frame):
         self.smiles_var = tk.StringVar()
         self.cas_var = tk.StringVar()
         self.compound_names_var = []
+        self._new_compound_names = []
         self._deleted_compound_names = []
         self.data_var = {}
+        self._new_data = []
         self._deleted_data = []
 
         self._build_ui()
@@ -742,6 +754,6 @@ if __name__ == "__main__":
     root = tk.Tk()
     style = ttk.Style()
     style.configure("Red.TLabel", foreground="red")
+    style.configure("Green.TLabel", foreground="green")
     g = GUI(root)
     tk.mainloop()
-# TODO: mark new names/data as green until commited (dont forget to clear them afterwards)
