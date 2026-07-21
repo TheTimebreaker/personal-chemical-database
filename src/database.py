@@ -39,6 +39,9 @@ class Database:
 
         self.read_db_metadata()
 
+    def _gen_uuid(self) -> None:
+        return uuid_module.uuid4()
+
     def search_in_db(
         self,
         *,
@@ -76,7 +79,7 @@ class Database:
             logging.error("Molecule could not be added to database, because such a molecule is already in there.")
             return False
 
-        molecule_uuid = str(uuid_module.uuid4())
+        molecule_uuid = str(self._gen_uuid())
         self.write_metadata_file(uuid=molecule_uuid, molecule=molecule)
         return True
 
@@ -184,18 +187,32 @@ class Database:
                 for name in molecule["names"]:
                     self.by_name[name] = uuid
 
-    def get_more_data(self, molecule_uuid: str) -> None:
+    def get_data_uuids(self, molecule_uuid: str) -> list[str] | None:
         molecule_data_path = self.molecules_path / molecule_uuid / "data"
         molecule_data_path.mkdir(parents=True, exist_ok=True)
-        for i, data_uuid_path in enumerate(molecule_data_path.iterdir()):
+        out = []
+        for data_uuid_path in molecule_data_path.iterdir():
             data_uuid = data_uuid_path.stem
-            print(i, data_uuid, self.read_more_data(molecule_uuid, data_uuid))
+            out.append(data_uuid)
+        if out:
+            return out
+        return None
 
-    def add_more_data(self, molecule_uuid: str, data: MoleculeData) -> None:
-        data_uuid = uuid_module.uuid4()
+    def add_data(self, molecule_uuid: str, data: MoleculeData, *, data_uuid: str | None = None) -> None:
+        if data_uuid is None:
+            data_uuid = self._gen_uuid()
         self.write_more_data(molecule_uuid, data_uuid, data)
 
-    def read_more_data(self, molecule_uuid: str, data_uuid: str) -> MoleculeData:
+    def delete_data(self, molecule_uuid: str, data_uuid: str) -> bool:
+        try:
+            file_path = self.molecules_path / molecule_uuid / "data" / f"{data_uuid}.json"
+            send2trash(file_path)
+            return True
+        except Exception as error:
+            logging.error("Deletion of data file %s failed: %s", file_path, repr(error))
+            return False
+
+    def read_data(self, molecule_uuid: str, data_uuid: str) -> MoleculeData:
         file_path = self.molecules_path / molecule_uuid / "data" / f"{data_uuid}.json"
         if not file_path.exists() or not file_path.is_file():
             raise ValueError("Path at %s does not point at file, cannot read.", str(file_path))
