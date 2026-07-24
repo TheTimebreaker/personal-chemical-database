@@ -3,6 +3,10 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 from typing import Any, Literal
 
+from PIL import ImageTk
+from rdkit import Chem
+from rdkit.Chem import Draw
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 from database import Database, Molecule, MoleculeData, generate_molecule_data, get_display_name
@@ -109,13 +113,22 @@ class AddMolecule(ttk.Frame):
         self._update_compound_names()
         self._update_data()
 
+        if self.viewer_mode is True:
+            molecule = Chem.MolFromSmiles(self.smiles_var.get())
+            draw = Draw.MolToImage(molecule, size=(150, 150), backgroundColor="red")  # TODO change bg color to transparent or same as window
+            drawtk = ImageTk.PhotoImage(draw)
+            xlabel = tk.Label(self, image=drawtk, relief="solid", borderwidth=2)
+            xlabel.bind("<Button-1>", lambda _: self._popup_lewis())
+            xlabel.image = drawtk
+            xlabel.grid(row=0, column=2, rowspan=6, padx=self.padx, pady=self.pady, sticky="n")
+
         # --- OK buttons
 
         separator = ttk.Separator(self, orient="horizontal")
-        separator.grid(row=6, column=0, columnspan=2, sticky="ew", padx=self.padx, pady=self.pady)
+        separator.grid(row=6, column=0, columnspan=3, sticky="ew", padx=self.padx, pady=self.pady)
 
         action_frame = ttk.Frame(self)
-        action_frame.grid(row=7, column=0, columnspan=2, sticky="e", padx=self.padx, pady=self.pady)
+        action_frame.grid(row=7, column=0, columnspan=3, sticky="e", padx=self.padx, pady=self.pady)
 
         self.autofill_button = ttk.Button(action_frame, text="Autofill", command=self._autofill)
         self.confirm_button = ttk.Button(action_frame, text="Confirm", command=self._confirm)
@@ -219,6 +232,26 @@ class AddMolecule(ttk.Frame):
         if not self.viewer_mode:
             button_add_data = ttk.Button(self.data_entry, text="Add data", command=self._open_add_data_dialog)
             button_add_data.pack(fill="x", expand=True, padx=self.padx, pady=self.pady)
+
+    def _popup_lewis(self) -> None:
+        dialog = tk.Toplevel(self)
+        dialog.update_idletasks()
+        dialog.title("LEWIS structure")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        smiles = self.smiles_var.get()
+        if not smiles:
+            return  # TODO
+
+        molecule = Chem.MolFromSmiles(smiles)
+        draw = Draw.MolToImage(molecule)
+        drawtk = ImageTk.PhotoImage(draw)
+        xlabel = tk.Label(dialog, image=drawtk)
+        xlabel.image = drawtk
+        xlabel.pack()
+
+        dialog.bind("<Return>", dialog.destroy)
 
     def _open_add_name_dialog(self) -> None:
         dialog = tk.Toplevel(self)
