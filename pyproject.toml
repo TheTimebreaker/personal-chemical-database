@@ -11,6 +11,17 @@ dependencies = [
   "send2trash~=2.1.0"
 ]
 
+[project.optional-dependencies]
+dev = [
+    "black~=26.5.1",
+    "mypy~=2.1.0",
+    "ruff~=0.15.17",
+    "pyinstaller",
+]
+compile = [
+    "pyinstaller",
+]
+
 
 [tool.ruff]
 line-length = 150
@@ -75,5 +86,5 @@ check_untyped_defs = true
 warn_unused_ignores = true
 warn_return_any = true
 [[tool.mypy.overrides]]
-module = ["pubchempy", "rdkit"]
+module = ["pubchempy", "rdkit", "rdkit-stubs"]
 ignore_missing_imports = true
