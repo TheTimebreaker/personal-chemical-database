@@ -24,6 +24,14 @@ class MoleculeData(TypedDict):
     source: str
 
 
+class NMRData(MoleculeData):
+    data_type: Literal["1H NMR", "13C NMR", "19F NMR", "31P NMR"]
+    solvent: str
+    frequency: float
+    data: str
+    source: str
+
+
 class Database:
     def __init__(self) -> None:
         self.db_path = db_path
@@ -196,7 +204,7 @@ class Database:
             out.append(data_uuid)
         return out
 
-    def add_data(self, molecule_uuid: str, data: MoleculeData, *, data_uuid: str | None = None) -> None:
+    def add_data(self, molecule_uuid: str, data: MoleculeData | NMRData, *, data_uuid: str | None = None) -> None:
         if data_uuid is None:
             data_uuid = self._gen_uuid()
         self.write_more_data(molecule_uuid, data_uuid, data)
@@ -210,7 +218,7 @@ class Database:
             logging.error("Deletion of data file %s failed: %s", file_path, repr(error))
             return False
 
-    def read_data(self, molecule_uuid: str, data_uuid: str) -> MoleculeData:
+    def read_data(self, molecule_uuid: str, data_uuid: str) -> MoleculeData | NMRData:
         file_path = self.molecules_path / molecule_uuid / "data" / f"{data_uuid}.json"
         if not file_path.exists() or not file_path.is_file():
             raise ValueError("Path at %s does not point at file, cannot read.", str(file_path))
@@ -221,13 +229,20 @@ class Database:
         datatype = data.get("data_type", None)
         data_content = data.get("data", None)
         source = data.get("source", None)
+        required_values = [datatype, data_content, source]
+        if "NMR" in datatype:
+            solvent = data.get("solvent", None)
+            frequency = data.get("frequency", None)
 
-        if any(val is None for val in (datatype, data_content, source)):
+        if any(val is None for val in required_values):
             raise ValueError("Molecule metadata file at path %s is invalid, arguments missing.", file_path)
 
-        return MoleculeData(data_type=datatype, data=data_content, source=source)
+        if "NMR" in datatype:
+            return NMRData(data_type=datatype, data=data_content, source=source, solvent=solvent, frequency=frequency)
+        else:
+            return MoleculeData(data_type=datatype, data=data_content, source=source)
 
-    def write_more_data(self, molecule_uuid: str, data_uuid: str, data: MoleculeData) -> None:
+    def write_more_data(self, molecule_uuid: str, data_uuid: str, data: MoleculeData | NMRData) -> None:
         file_path = self.molecules_path / molecule_uuid / "data" / f"{data_uuid}.json"
         file_path.parent.mkdir(parents=True, exist_ok=True)
         with open(file_path, "w", encoding="utf-8") as file:

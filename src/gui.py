@@ -2,6 +2,7 @@ import logging
 import tkinter as tk
 from tkinter import messagebox, ttk
 from typing import Any, Literal
+from typing import TypeGuard
 
 from PIL import ImageTk
 from rdkit import Chem
@@ -9,7 +10,7 @@ from rdkit.Chem import Draw
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-from database import Database, Molecule, MoleculeData, generate_molecule_data, get_display_name
+from database import Database, Molecule, MoleculeData, NMRData, generate_molecule_data, get_display_name
 from style import configure_ttk_style
 
 
@@ -72,7 +73,7 @@ class AddMolecule(ttk.Frame):
         self.compound_names_var: list[str] = []
         self._new_compound_names: list[str] = []
         self._deleted_compound_names: list[str] = []  # unused in here, but used in descendants
-        self.data_var: dict[str, MoleculeData] = {}
+        self.data_var: dict[str, MoleculeData | NMRData] = {}
         self._new_data: list[str] = []
         self._deleted_data: list[str] = []  # unused in here, but used in descendants
 
@@ -115,7 +116,9 @@ class AddMolecule(ttk.Frame):
 
         if self.viewer_mode is True:
             molecule = Chem.MolFromSmiles(self.smiles_var.get())
-            draw = Draw.MolToImage(molecule, size=(150, 150), backgroundColor="red")  # TODO change bg color to transparent or same as window
+            draw = Draw.MolToImage(
+                molecule, size=(150, 150), backgroundColor="red"
+            )  # TODO(TheTimebreaker): change bg color to transparent or same as window
             drawtk = ImageTk.PhotoImage(draw)
             xlabel = tk.Label(self, image=drawtk, relief="solid", borderwidth=2)
             xlabel.bind("<Button-1>", lambda _: self._popup_lewis())
@@ -242,7 +245,7 @@ class AddMolecule(ttk.Frame):
 
         smiles = self.smiles_var.get()
         if not smiles:
-            return  # TODO
+            return
 
         molecule = Chem.MolFromSmiles(smiles)
         draw = Draw.MolToImage(molecule)
@@ -322,7 +325,7 @@ class AddMolecule(ttk.Frame):
         *,
         molecule_uuid: str | None = None,
         data_uuid: str | None = None,
-        data: MoleculeData | None = None,
+        data: MoleculeData | NMRData | None = None,
     ) -> None:
         if data is None:
             if not molecule_uuid or not data_uuid:
@@ -335,20 +338,24 @@ class AddMolecule(ttk.Frame):
         dialog.transient(self.root)
         dialog.wait_visibility()
         dialog.grab_set()
-        dialog.resizable(False, False)
+        dialog.resizable(True, False)
 
         fields = [
             ("Type", data.get("data_type", "")),
-            ("Data", data.get("data", "")),
-            ("Source", data.get("source", "")),
         ]
+        if "NMR" in data.get("data_type", ""):
+            fields.append(("Solvent", data.get("solvent", "")))
+            fields.append(("Frequency", data.get("frequency", "")))
+        fields.append(("Data", data.get("data", "")))
+        fields.append(("Source", data.get("source", "")))
+
         self.anti_garbagecollector = []  # this is necessary to prevent the ENTRYs from being brutally murdered by python
         for row, (label_text, val) in enumerate(fields):
             ttk.Label(dialog, text=f"{label_text}:").grid(row=row, column=0, sticky="w", padx=5, pady=5)
             el = ttk.Entry(dialog)
             el.insert(0, str(val))
             el.configure(state="readonly")
-            el.grid(row=row, column=2, sticky="ew", padx=5, pady=5)
+            el.grid(row=row, column=1, sticky="ew", padx=5, pady=5)
             self.anti_garbagecollector.append(el)
 
         dialog.columnconfigure(1, weight=1)
