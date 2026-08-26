@@ -2,7 +2,6 @@ import logging
 import tkinter as tk
 from tkinter import messagebox, ttk
 from typing import Any, Literal
-from typing import TypeGuard
 
 from PIL import ImageTk
 from rdkit import Chem
@@ -75,6 +74,7 @@ class AddMolecule(ttk.Frame):
         self._deleted_compound_names: list[str] = []  # unused in here, but used in descendants
         self.data_var: dict[str, MoleculeData | NMRData] = {}
         self._new_data: list[str] = []
+        self._updated_data: list[str] = []
         self._deleted_data: list[str] = []  # unused in here, but used in descendants
 
         self._build_ui()
@@ -195,7 +195,7 @@ class AddMolecule(ttk.Frame):
                     ).grid(row=i, column=1, padx=self.padx, pady=0)
 
         if not self.viewer_mode:
-            button_add_names = ttk.Button(self.names_entry, text="Add name", command=self._open_add_name_dialog)
+            button_add_names = ttk.Button(self.names_entry, text="Add name", command=self.open_data_dialog)
             button_add_names.pack(fill="x", expand=True, padx=self.padx, pady=self.pady)
 
     def _update_data(self) -> None:
@@ -208,15 +208,18 @@ class AddMolecule(ttk.Frame):
         for i, (data_uuid, data) in enumerate(self.data_var.items()):
             marked_for_deletion = data_uuid in self._deleted_data
             marked_as_new = data_uuid in self._new_data
+            marked_as_edited = data_uuid in self._updated_data
             if marked_for_deletion:
-                styl = "Red.TLabel"
+                styl = "Deleted.TLabel"
             elif marked_as_new:
-                styl = "Green.TLabel"
+                styl = "New.TLabel"
+            elif marked_as_edited:
+                styl = "Edited.TLabel"
             else:
                 styl = ""
 
             lab = ttk.Label(frame, text=f"#{data_uuid}-{data["data_type"]}", style=styl)
-            lab.bind("<Button-1>", lambda _event, data=data: self._open_view_data_dialog(data=data))
+            lab.bind("<Button-1>", lambda _event, data_uuid=data_uuid, data=data: self.open_data_dialog(data=data, data_uuid=data_uuid))
             lab.grid(row=i, column=0, sticky="ew", padx=self.padx, pady=self.pady)
             if not self.viewer_mode:
                 if marked_for_deletion:
@@ -233,7 +236,7 @@ class AddMolecule(ttk.Frame):
                     ).grid(row=i, column=1, padx=self.padx, pady=0)
 
         if not self.viewer_mode:
-            button_add_data = ttk.Button(self.data_entry, text="Add data", command=self._open_add_data_dialog)
+            button_add_data = ttk.Button(self.data_entry, text="Add data", command=self.open_data_dialog)
             button_add_data.pack(fill="x", expand=True, padx=self.padx, pady=self.pady)
 
     def _popup_lewis(self) -> None:
@@ -279,58 +282,49 @@ class AddMolecule(ttk.Frame):
         entry.focus_set()
         dialog.bind("<Return>", lambda _: self._confirm_add_name(dialog, entry_var))
 
-    def _open_add_data_dialog(self) -> None:
-        dialog = tk.Toplevel(self)
-        dialog.title("Add a data entry")
-        dialog.transient(self.root)
-        dialog.grab_set()
-
-        type_var = tk.StringVar()
-        data_var = tk.StringVar()
-        source_var = tk.StringVar()
-
-        label1 = ttk.Label(dialog, text="Data type:")
-        entry1 = ttk.Combobox(
-            dialog,
-            textvariable=type_var,
-            values=["1H NMR", "13C NMR", "19F NMR", "31P NMR", "IR", "Mass", "boiling point", "melting point", "color"],
-            state="readonly",
-        )
-
-        label2 = ttk.Label(dialog, text="Data:")
-        entry2 = ttk.Entry(dialog, textvariable=data_var)
-
-        label3 = ttk.Label(dialog, text="Source:")
-        entry3 = ttk.Entry(dialog, textvariable=source_var)
-
-        button_frame = ttk.Frame(dialog)
-        button_confirm = ttk.Button(button_frame, text="Confirm", command=lambda: self._confirm_add_data(dialog, type_var, data_var, source_var))
-        button_cancel = ttk.Button(button_frame, text="Cancel", command=dialog.destroy)
-
-        label1.grid(row=0, column=0, sticky="w", padx=self.padx, pady=self.pady)
-        entry1.grid(row=0, column=1, sticky="ew", padx=self.padx, pady=self.pady)
-        label2.grid(row=1, column=0, sticky="w", padx=self.padx, pady=self.pady)
-        entry2.grid(row=1, column=1, sticky="ew", padx=self.padx, pady=self.pady)
-        label3.grid(row=2, column=0, sticky="w", padx=self.padx, pady=self.pady)
-        entry3.grid(row=2, column=1, sticky="ew", padx=self.padx, pady=self.pady)
-        button_frame.grid(row=4, column=0, columnspan=2, sticky="e", padx=self.padx, pady=self.pady)
-        button_cancel.pack(side="right", padx=self.padx, pady=self.pady)
-        button_confirm.pack(side="right", padx=self.padx, pady=self.pady)
-
-        dialog.grid_columnconfigure(1, weight=1)
-        dialog.bind("<Return>", lambda _: self._confirm_add_data(dialog, type_var, data_var, source_var))
-
-    def _open_view_data_dialog(
+    def open_data_dialog(
         self,
         *,
         molecule_uuid: str | None = None,
         data_uuid: str | None = None,
         data: MoleculeData | NMRData | None = None,
     ) -> None:
+        def _build_ui() -> None:
+            for child in dialog.winfo_children():
+                child.destroy()
+
+            dialog.entries = []
+            for row, label_text in enumerate(fields.keys()):
+                if label_text in ("Solvent", "Frequency") and "NMR" not in fields["Type"].get():
+                    continue
+                ttk.Label(dialog, text=f"{label_text}:").grid(row=row, column=0, sticky="w", padx=5, pady=5)
+                if label_text in ("Type",):
+                    el = ttk.Combobox(
+                        dialog,
+                        textvariable=fields[label_text],
+                        values=["1H NMR", "13C NMR", "19F NMR", "31P NMR", "IR", "Mass", "boiling point", "melting point", "color"],
+                        state="readonly",
+                    )
+                    el.bind("<<ComboboxSelected>>", lambda _: _build_ui())
+                else:
+                    el = ttk.Entry(dialog, textvariable=fields[label_text])
+                el.configure(state=self.edit_state)
+                el.grid(row=row, column=1, sticky="ew", padx=5, pady=5)
+                dialog.entries.append(el)
+
+            if self.viewer_mode is False:
+                button_frame = ttk.Frame(dialog)
+                button_confirm = ttk.Button(button_frame, text="Confirm", command=lambda: self._confirm_add_data(dialog, fields, data_uuid))
+                button_cancel = ttk.Button(button_frame, text="Cancel", command=dialog.destroy)
+                button_frame.grid(row=row + 1, column=0, columnspan=2, sticky="e", padx=self.padx, pady=self.pady)
+                button_cancel.pack(side="right", padx=self.padx, pady=self.pady)
+                button_confirm.pack(side="right", padx=self.padx, pady=self.pady)
+
         if data is None:
-            if not molecule_uuid or not data_uuid:
-                raise ValueError("Either data or both molecule_uuid and data_uuid must be provided.")
-            data = self.parent.database.read_data(molecule_uuid, data_uuid)
+            if molecule_uuid and data_uuid:
+                data = self.parent.database.read_data(molecule_uuid, data_uuid)
+            else:
+                data = {}
         logging.info(data)
 
         dialog = tk.Toplevel(self.root)
@@ -340,24 +334,18 @@ class AddMolecule(ttk.Frame):
         dialog.grab_set()
         dialog.resizable(True, False)
 
-        fields = [
-            ("Type", data.get("data_type", "")),
-        ]
-        if "NMR" in data.get("data_type", ""):
-            fields.append(("Solvent", data.get("solvent", "")))
-            fields.append(("Frequency", data.get("frequency", "")))
-        fields.append(("Data", data.get("data", "")))
-        fields.append(("Source", data.get("source", "")))
+        fields = {
+            "Type": tk.StringVar(value=data.get("data_type", "")),
+            "Solvent": tk.StringVar(value=data.get("solvent", "")),
+            "Frequency": tk.StringVar(value=data.get("frequency", "")),
+            "Data": tk.StringVar(value=data.get("data", "")),
+            "Source": tk.StringVar(value=data.get("source", "")),
+        }
 
-        self.anti_garbagecollector = []  # this is necessary to prevent the ENTRYs from being brutally murdered by python
-        for row, (label_text, val) in enumerate(fields):
-            ttk.Label(dialog, text=f"{label_text}:").grid(row=row, column=0, sticky="w", padx=5, pady=5)
-            el = ttk.Entry(dialog)
-            el.insert(0, str(val))
-            el.configure(state="readonly")
-            el.grid(row=row, column=1, sticky="ew", padx=5, pady=5)
-            self.anti_garbagecollector.append(el)
+        dialog.fields = fields
+        _build_ui()
 
+        dialog.bind("<Return>", lambda _: self._confirm_add_data(dialog, fields, data_uuid))
         dialog.columnconfigure(1, weight=1)
         dialog.minsize(320, 0)
 
@@ -402,14 +390,32 @@ class AddMolecule(ttk.Frame):
                 title="Invalid entry", message="The field was detected as being empty, which is disallowed (and would not make any sense)."
             )
 
-    def _confirm_add_data(self, dialog: tk.Toplevel, type_var: tk.StringVar, data_var: tk.StringVar, source_var: tk.StringVar) -> None:
-        type_value = type_var.get().strip()
-        data_value = data_var.get().strip()
-        source_value = source_var.get().strip()
+    def _confirm_add_data(
+        self, dialog: tk.Toplevel, fields: dict[Literal["Type", "Solvent", "Frequency", "Data", "Source"], tk.StringVar], data_uuid: str | None = None
+    ) -> None:
+        # get all the variables
+        type_value = fields["Type"].get().strip()
+        solvent_value = fields["Solvent"].get().strip()
+        frequency_value = fields["Frequency"].get().strip()
+        data_value = fields["Data"].get().strip()
+        source_value = fields["Source"].get().strip()
+
+        # Data UUID
+        if data_uuid is None:
+            data_uuid = self.parent.database._gen_uuid()
+
+        if "NMR" in type_value:
+            data_obj = NMRData(data_type=type_value, data=data_value, source=source_value, solvent=solvent_value, frequency=frequency_value)
+        else:
+            data_obj = MoleculeData(data_type=type_value, data=data_value, source=source_value)
+
         if type_value and data_value and source_value:
-            new_data_uuid = self.parent.database._gen_uuid()
-            self.data_var[new_data_uuid] = MoleculeData(data_type=type_value, data=data_value, source=source_value)
-            self._new_data.append(new_data_uuid)
+            if data_uuid not in self.data_var:
+                self._new_data.append(data_uuid)
+            else:
+                self._updated_data.append(data_uuid)
+
+            self.data_var[data_uuid] = data_obj
             self._update_data()
             dialog.destroy()
         else:
@@ -483,11 +489,14 @@ class AddMolecule(ttk.Frame):
             for data_uuid, data in self.data_var.items():
                 molecule_has_data = bool(existing_data_uuids)
                 data_exists = data_uuid in existing_data_uuids
+                data_updated = data_uuid in self._updated_data
                 data_was_deleted = data_uuid in self._deleted_data
                 if data_was_deleted:
                     self.parent.database.delete_data(molecule_uuid=molecule_uuid, data_uuid=data_uuid)
                 elif not molecule_has_data or not data_exists:
                     self.parent.database.add_data(molecule_uuid, data=data, data_uuid=data_uuid)
+                elif data_updated:
+                    self.parent.database.modify_data(molecule_uuid, data=data, data_uuid=data_uuid)
 
             self._clear()
 
@@ -516,6 +525,8 @@ class AddMolecule(ttk.Frame):
 
 
 class EditMolecule(AddMolecule):
+    edit_state = "normal"
+
     def _build_ui(self) -> None:
         super()._build_ui()
         self.autofill_button.pack_forget()
@@ -550,6 +561,7 @@ class EditMolecule(AddMolecule):
             for data_uuid, data in self.data_var.items():
                 molecule_has_data = bool(existing_data_uuids)
                 data_exists = data_uuid in existing_data_uuids
+                data_updated = data_uuid in self._updated_data
                 data_was_deleted = data_uuid in self._deleted_data
                 print(data_uuid, self._deleted_data, data_was_deleted)
                 if data_was_deleted:
@@ -557,6 +569,8 @@ class EditMolecule(AddMolecule):
                 elif not molecule_has_data or not data_exists:
                     logging.info("committing new data for molecule %s datauuid %s to database: %s", molecule_uuid, data_uuid, data)
                     self.parent.database.add_data(molecule_uuid, data=data, data_uuid=data_uuid)
+                elif data_updated:
+                    self.parent.database.modify_data(molecule_uuid, data=data, data_uuid=data_uuid)
 
             self._clear()
             self.parent.browse_tab._build_ui()

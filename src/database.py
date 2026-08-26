@@ -209,6 +209,11 @@ class Database:
             data_uuid = self._gen_uuid()
         self.write_more_data(molecule_uuid, data_uuid, data)
 
+    def modify_data(self, molecule_uuid: str, data: MoleculeData | NMRData, *, data_uuid: str | None = None) -> None:
+        if data_uuid is None:
+            raise ValueError
+        self.write_more_data(molecule_uuid, data_uuid, data)
+
     def delete_data(self, molecule_uuid: str, data_uuid: str) -> bool:
         try:
             file_path = self.molecules_path / molecule_uuid / "data" / f"{data_uuid}.json"
