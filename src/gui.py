@@ -116,9 +116,7 @@ class AddMolecule(ttk.Frame):
 
         if self.viewer_mode is True:
             molecule = Chem.MolFromSmiles(self.smiles_var.get())
-            draw = Draw.MolToImage(
-                molecule, size=(150, 150), backgroundColor="red"
-            )  # TODO(TheTimebreaker): change bg color to transparent or same as window
+            draw = Draw.MolToImage(molecule, size=(150, 150), backgroundColor="red")
             drawtk = ImageTk.PhotoImage(draw)
             xlabel = tk.Label(self, image=drawtk, relief="solid", borderwidth=2)
             xlabel.bind("<Button-1>", lambda _: self._popup_lewis())
@@ -195,7 +193,7 @@ class AddMolecule(ttk.Frame):
                     ).grid(row=i, column=1, padx=self.padx, pady=0)
 
         if not self.viewer_mode:
-            button_add_names = ttk.Button(self.names_entry, text="Add name", command=self.open_data_dialog)
+            button_add_names = ttk.Button(self.names_entry, text="Add name", command=self._open_add_name_dialog)
             button_add_names.pack(fill="x", expand=True, padx=self.padx, pady=self.pady)
 
     def _update_data(self) -> None:
@@ -700,25 +698,38 @@ class Browse(ttk.Frame):
         self._build_ui()
 
     def _build_ui(self) -> None:
-        self.columnconfigure(0, weight=1)
         for child in self.winfo_children():
             child.destroy()
 
+        self.scroll_canvas = tk.Canvas(self, highlightthickness=0, borderwidth=0)
+        self.scrollbar = tk.Scrollbar(self, orient="vertical", command=self.scroll_canvas.yview)
+        self.scrollable_frame = tk.Frame(self.scroll_canvas)
+        self.scrollable_frame.bind("<Configure>", lambda _event: self.scroll_canvas.configure(scrollregion=self.scroll_canvas.bbox("all")))
+
+        window_id = self.scroll_canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        self.scroll_canvas.bind("<Configure>", lambda e: self.scroll_canvas.itemconfigure(window_id, width=e.width))
+        self.scroll_canvas.configure(yscrollcommand=self.scrollbar.set)
+        self.scroll_canvas.bind_all("<MouseWheel>", lambda event: self.scroll_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units"))
+        self.scroll_canvas.pack(side="left", fill="both", expand=True)
+        self.scrollbar.pack(side="right", fill="y")
+
+        self.scrollable_frame.columnconfigure(0, weight=1)
+
         for i, (molecule_uuid, molecule) in enumerate(self.parent.database.by_uuid.items()):
             print(molecule_uuid, molecule)
-            ttk.Label(self, text=get_display_name(molecule)).grid(row=i, column=0, padx=self.padx, pady=self.pady, sticky="ew")
+            ttk.Label(self.scrollable_frame, text=get_display_name(molecule)).grid(row=i, column=0, padx=self.padx, pady=self.pady, sticky="ew")
             ttk.Button(
-                self,
+                self.scrollable_frame,
                 text="View",
                 command=lambda molecule_uuid=molecule_uuid: self._view(molecule_uuid),
             ).grid(row=i, column=1, padx=self.padx, pady=self.pady)
             ttk.Button(
-                self,
+                self.scrollable_frame,
                 text="Edit",
                 command=lambda molecule_uuid=molecule_uuid: self._edit(molecule_uuid),
             ).grid(row=i, column=2, padx=self.padx, pady=self.pady)
             ttk.Button(
-                self,
+                self.scrollable_frame,
                 text="Delete",
                 command=lambda molecule_uuid=molecule_uuid: self._delete(molecule_uuid),
             ).grid(row=i, column=3, padx=self.padx, pady=self.pady)
