@@ -517,6 +517,7 @@ class AddMolecule(ttk.Frame):
         self._deleted_compound_names = []
         self.data_var = {}
         self._new_data = []
+        self._updated_data = []
         self._deleted_data = []
 
         self._build_ui()
