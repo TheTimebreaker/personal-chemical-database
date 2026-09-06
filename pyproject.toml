@@ -8,10 +8,11 @@ requires-python=">=3.14"
 dependencies = [
   "rdkit~=2026.3.3",
   "pubchempy~=1.0.5",
-  "send2trash~=2.1.0"
+  "send2trash~=2.1.0",
+  "platformdirs>=4.11.5",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "black~=26.5.1",
     "mypy~=2.1.0",
