@@ -25,11 +25,11 @@ class MoleculeData(TypedDict):
 
 
 class NMRData(MoleculeData):
-    data_type: Literal["1H NMR", "13C NMR", "19F NMR", "31P NMR"]
+    data_type: Literal["1H NMR", "13C NMR", "19F NMR", "31P NMR"]  # type: ignore
     solvent: str
     frequency: float
-    data: str
-    source: str
+    data: str  # type: ignore
+    source: str  # type: ignore
 
 
 class Database:
@@ -47,8 +47,8 @@ class Database:
 
         self.read_db_metadata()
 
-    def _gen_uuid(self) -> None:
-        return uuid_module.uuid4()
+    def _gen_uuid(self) -> str:
+        return str(uuid_module.uuid4())
 
     def search_in_db(
         self,
@@ -67,18 +67,19 @@ class Database:
                 inchi = f"InChI={inchi}"
             return self.by_inchi.get(inchi, None)
         elif inchikey is not None:
-            return self.by_inchikey(inchikey, None)
+            return self.by_inchikey.get(inchikey, None)
         elif smiles is not None:
             return self.by_smiles.get(smiles, None)
         elif cas is not None:
             return self.by_cas.get(cas, None)
         elif compound_name is not None:
             return self.by_name.get(compound_name, None)
+        return None
 
     def is_this_in_db(self, *, uuid: str | None = None, molecule: Molecule | None = None) -> bool:
-        if self.by_uuid.get(uuid, None):
+        if uuid and self.by_uuid.get(uuid, None):
             return True
-        if self.by_inchikey.get(molecule["inchikey"], None):
+        if molecule and self.by_inchikey.get(molecule["inchikey"], None):
             return True
         return False
 
@@ -101,7 +102,7 @@ class Database:
 
     def delete_entry(
         self,
-        uuid: str | None = None,
+        uuid: str,
     ) -> bool:
 
         print("Deleting molecule from database...")
@@ -114,7 +115,7 @@ class Database:
 
     def add_entry_names(
         self,
-        uuid: str | None = None,
+        uuid: str,
     ) -> bool:
         result = self.by_uuid[uuid]
         print(f"Current names: {result["names"]}")
@@ -140,7 +141,7 @@ class Database:
 
     def modify_entry_cas(
         self,
-        uuid: str | None = None,
+        uuid: str,
     ) -> None:
         result = self.by_uuid[uuid]
         print(f"Selected molecule: {result}")
@@ -153,8 +154,6 @@ class Database:
         result["cas"] = add
 
         self.write_metadata_file(uuid=uuid, molecule=result)
-
-        return True
 
     def read_metadata_file(self, uuid: str) -> Molecule:
         file_path = self.molecules_path / uuid / "metadata.json"

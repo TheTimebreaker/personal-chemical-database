@@ -62,7 +62,7 @@ class AddMolecule(ttk.Frame):
         )
         self.parent = parent
         self.root = root
-        self.previous_tab = None
+        self.previous_tab: Browse | AddMolecule | EditMolecule | View | None = None
 
         self.inchi_var = tk.StringVar()
         self.inchikey_var = tk.StringVar()
@@ -120,7 +120,7 @@ class AddMolecule(ttk.Frame):
             drawtk = ImageTk.PhotoImage(draw)
             xlabel = tk.Label(self, image=drawtk, relief="solid", borderwidth=2)
             xlabel.bind("<Button-1>", lambda _: self._popup_lewis())
-            xlabel.image = drawtk
+            xlabel.image = drawtk  # type: ignore
             xlabel.grid(row=0, column=2, rowspan=6, padx=self.padx, pady=self.pady, sticky="n")
 
         # --- OK buttons
@@ -148,9 +148,9 @@ class AddMolecule(ttk.Frame):
         self.inchikey_var.set(molecule["inchikey"])
         self.smiles_var.set(molecule["smiles"])
         if molecule.get("cas", None):
-            self.cas_var.set(molecule.get("cas", None))
+            self.cas_var.set(molecule.get("cas"))  # type: ignore
         if molecule.get("names", None):
-            self.compound_names_var = molecule["names"]
+            self.compound_names_var = molecule.get("names")  # type: ignore
         mol_data_uuids = self.parent.database.get_data_uuids(molecule_uuid)
         logging.info("data uuids found: mol_data_uuids=%s", mol_data_uuids)
         if mol_data_uuids:
@@ -183,13 +183,13 @@ class AddMolecule(ttk.Frame):
                     ttk.Button(
                         frame,
                         text="Undo",
-                        command=lambda name=name: self._remove_this_name_undo(name),
+                        command=lambda name=name: self._remove_this_name_undo(name),  # type: ignore
                     ).grid(row=i, column=1, padx=self.padx, pady=0)
                 else:
                     ttk.Button(
                         frame,
                         text="Delete",
-                        command=lambda name=name: self._remove_this_name(name),
+                        command=lambda name=name: self._remove_this_name(name),  # type: ignore
                     ).grid(row=i, column=1, padx=self.padx, pady=0)
 
         if not self.viewer_mode:
@@ -217,20 +217,20 @@ class AddMolecule(ttk.Frame):
                 styl = ""
 
             lab = ttk.Label(frame, text=f"#{data_uuid}-{data["data_type"]}", style=styl)
-            lab.bind("<Button-1>", lambda _event, data_uuid=data_uuid, data=data: self.open_data_dialog(data=data, data_uuid=data_uuid))
+            lab.bind("<Button-1>", lambda _event, data_uuid=data_uuid, data=data: self.open_data_dialog(data=data, data_uuid=data_uuid))  # type: ignore
             lab.grid(row=i, column=0, sticky="ew", padx=self.padx, pady=self.pady)
             if not self.viewer_mode:
                 if marked_for_deletion:
                     ttk.Button(
                         frame,
                         text="Undo",
-                        command=lambda data_uuid=data_uuid: self._remove_this_data_undo(data_uuid),
+                        command=lambda data_uuid=data_uuid: self._remove_this_data_undo(data_uuid),  # type: ignore
                     ).grid(row=i, column=1, padx=self.padx, pady=0)
                 else:
                     ttk.Button(
                         frame,
                         text="Delete",
-                        command=lambda data_uuid=data_uuid: self._remove_this_data(data_uuid),
+                        command=lambda data_uuid=data_uuid: self._remove_this_data(data_uuid),  # type: ignore
                     ).grid(row=i, column=1, padx=self.padx, pady=0)
 
         if not self.viewer_mode:
@@ -252,10 +252,10 @@ class AddMolecule(ttk.Frame):
         draw = Draw.MolToImage(molecule)
         drawtk = ImageTk.PhotoImage(draw)
         xlabel = tk.Label(dialog, image=drawtk)
-        xlabel.image = drawtk
+        xlabel.image = drawtk  # type: ignore
         xlabel.pack()
 
-        dialog.bind("<Return>", dialog.destroy)
+        dialog.bind("<Return>", lambda _event: dialog.destroy())
 
     def _open_add_name_dialog(self) -> None:
         dialog = tk.Toplevel(self)
@@ -322,8 +322,10 @@ class AddMolecule(ttk.Frame):
             if molecule_uuid and data_uuid:
                 data = self.parent.database.read_data(molecule_uuid, data_uuid)
             else:
-                data = {}
+                data = {}  # type: ignore
         logging.info(data)
+        if data is None:
+            raise ValueError
 
         dialog = tk.Toplevel(self.root)
         dialog.title("Data details")
@@ -332,15 +334,15 @@ class AddMolecule(ttk.Frame):
         dialog.grab_set()
         dialog.resizable(True, False)
 
-        fields = {
-            "Type": tk.StringVar(value=data.get("data_type", "")),
-            "Solvent": tk.StringVar(value=data.get("solvent", "")),
-            "Frequency": tk.StringVar(value=data.get("frequency", "")),
-            "Data": tk.StringVar(value=data.get("data", "")),
-            "Source": tk.StringVar(value=data.get("source", "")),
+        fields: dict[Literal["Type", "Solvent", "Frequency", "Data", "Source"], tk.StringVar] = {
+            "Type": tk.StringVar(value=str(data.get("data_type", ""))),
+            "Solvent": tk.StringVar(value=str(data.get("solvent", ""))),
+            "Frequency": tk.StringVar(value=str(data.get("frequency", ""))),
+            "Data": tk.StringVar(value=str(data.get("data", ""))),
+            "Source": tk.StringVar(value=str(data.get("source", ""))),
         }
 
-        dialog.fields = fields
+        dialog.fields = fields  # type: ignore
         _build_ui()
 
         dialog.bind("<Return>", lambda _: self._confirm_add_data(dialog, fields, data_uuid))
@@ -403,9 +405,9 @@ class AddMolecule(ttk.Frame):
             data_uuid = self.parent.database._gen_uuid()
 
         if "NMR" in type_value:
-            data_obj = NMRData(data_type=type_value, data=data_value, source=source_value, solvent=solvent_value, frequency=frequency_value)
+            data_obj = NMRData(data_type=type_value, data=data_value, source=source_value, solvent=solvent_value, frequency=frequency_value)  # type: ignore
         else:
-            data_obj = MoleculeData(data_type=type_value, data=data_value, source=source_value)
+            data_obj = MoleculeData(data_type=type_value, data=data_value, source=source_value)  # type: ignore
 
         if type_value and data_value and source_value:
             if data_uuid not in self.data_var:
@@ -420,26 +422,27 @@ class AddMolecule(ttk.Frame):
             messagebox.showerror(title="Invalid entry", message="Some values were detected as being empty, which is disallowed.")
 
     def _autofill(self) -> None:
-        inchi = self.inchi_var.get()
+        inchi: str | None = self.inchi_var.get()
         if not inchi:
             inchi = None
-        inchikey = self.inchikey_var.get()
+        inchikey: str | None = self.inchikey_var.get()
         if not inchikey:
             inchikey = None
-        smiles = self.smiles_var.get()
+        smiles: str | None = self.smiles_var.get()
         if not smiles:
             smiles = None
-        cas = self.cas_var.get()
+        cas: str | None = self.cas_var.get()
         if not cas:
             cas = None
-        names = self.compound_names_var
+        names: list[str] | None = self.compound_names_var
+        name: str | None
         if not names:
-            names = None
+            name = None
         else:
-            names = names[0]
+            name = names[0]
 
         try:
-            molecule = generate_molecule_data(inchi=inchi, inchikey=inchikey, smiles=smiles, cas=cas, compound_name=names)
+            molecule = generate_molecule_data(inchi=inchi, inchikey=inchikey, smiles=smiles, cas=cas, compound_name=name)
         except ValueError:
             messagebox.showerror(
                 title="Autofill not successfull",
@@ -464,10 +467,10 @@ class AddMolecule(ttk.Frame):
         inchi = self.inchi_var.get()
         inchikey = self.inchikey_var.get()
         smiles = self.smiles_var.get()
-        cas = self.cas_var.get()
+        cas: str | None = self.cas_var.get()
         if not cas:
             cas = None
-        names = self.compound_names_var
+        names: list[str] | None = self.compound_names_var
         if not names:
             names = None
         names = [x for x in self.compound_names_var if x not in self._deleted_compound_names]
@@ -480,7 +483,7 @@ class AddMolecule(ttk.Frame):
             return
 
         if self.parent.database.create_entry(molecule):
-            self.parent.database.__init__()
+            self.parent.database.__init__()  # type: ignore
 
             molecule_uuid = self.parent.database.by_inchi[inchi]
             existing_data_uuids = self.parent.database.get_data_uuids(molecule_uuid)
@@ -535,12 +538,9 @@ class EditMolecule(AddMolecule):
         inchi = self.inchi_var.get()
         inchikey = self.inchikey_var.get()
         smiles = self.smiles_var.get()
-        cas = self.cas_var.get()
+        cas: str | None = self.cas_var.get()
         if not cas:
             cas = None
-        names = self.compound_names_var
-        if not names:
-            names = None
         names = [x for x in self.compound_names_var if x not in self._deleted_compound_names]
 
         molecule_uuid = self.molecule_uuid_var
@@ -554,7 +554,7 @@ class EditMolecule(AddMolecule):
         molecule = Molecule(inchi=inchi, inchikey=inchikey, smiles=smiles, cas=cas, names=names)
 
         if self.parent.database.overwrite_entry(molecule_uuid=molecule_uuid, molecule=molecule):
-            self.parent.database.__init__()
+            self.parent.database.__init__()  # type: ignore
 
             existing_data_uuids = self.parent.database.get_data_uuids(molecule_uuid)
             for data_uuid, data in self.data_var.items():
@@ -721,17 +721,17 @@ class Browse(ttk.Frame):
             ttk.Button(
                 self.scrollable_frame,
                 text="View",
-                command=lambda molecule_uuid=molecule_uuid: self._view(molecule_uuid),
+                command=lambda molecule_uuid=molecule_uuid: self._view(molecule_uuid),  # type: ignore
             ).grid(row=i, column=1, padx=self.padx, pady=self.pady)
             ttk.Button(
                 self.scrollable_frame,
                 text="Edit",
-                command=lambda molecule_uuid=molecule_uuid: self._edit(molecule_uuid),
+                command=lambda molecule_uuid=molecule_uuid: self._edit(molecule_uuid),  # type: ignore
             ).grid(row=i, column=2, padx=self.padx, pady=self.pady)
             ttk.Button(
                 self.scrollable_frame,
                 text="Delete",
-                command=lambda molecule_uuid=molecule_uuid: self._delete(molecule_uuid),
+                command=lambda molecule_uuid=molecule_uuid: self._delete(molecule_uuid),  # type: ignore
             ).grid(row=i, column=3, padx=self.padx, pady=self.pady)
 
     def _view(self, molecule_uuid: str) -> None:
@@ -766,7 +766,7 @@ class Browse(ttk.Frame):
                 title="Deletion unsuccessful",
                 message=f"Could not delete molecule {molecule_uuid} due to an unknown error.",
             )
-        self.parent.database.__init__()
+        self.parent.database.__init__()  # type: ignore
         self._build_ui()
 
 
