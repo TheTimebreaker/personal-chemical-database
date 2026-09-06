@@ -1,7 +1,7 @@
 TODO: view data must be larger/auto-resize (maybe zeilenumbruch?)
 
 sort names
-readd deleted names doesnt work atm
+re-add deleted names doesnt work atm
 add Search page
 
 data: NMR solvent/freq should be displayed in Viewer
