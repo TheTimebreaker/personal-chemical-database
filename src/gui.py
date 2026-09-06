@@ -698,6 +698,35 @@ class Browse(ttk.Frame):
         self._build_ui()
 
     def _build_ui(self) -> None:
+        for child in self.winfo_children():
+            child.destroy()
+
+        self.search = ttk.Frame(self)
+        self.search_label = ttk.Label(self.search, text="Search: ")
+        self.search_label.grid(column=0, row=0, padx=self.padx, pady=self.pady)
+        self.search_var = tk.StringVar(self)
+        self.search_box = ttk.Entry(self.search, textvariable=self.search_var)
+        self.search_box.grid(column=1, row=0, sticky="ew", padx=self.padx, pady=self.pady)
+        self.search.columnconfigure(1, weight=1)
+        self.search.pack(fill="both", expand=True)
+
+        self.scroll_canvas = tk.Canvas(self, highlightthickness=0, borderwidth=0)
+        self.scrollbar = tk.Scrollbar(self, orient="vertical", command=self.scroll_canvas.yview)
+        self.scrollable_frame = tk.Frame(self.scroll_canvas)
+        self.scrollable_frame.bind("<Configure>", lambda _event: self.scroll_canvas.configure(scrollregion=self.scroll_canvas.bbox("all")))
+
+        window_id = self.scroll_canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        self.scroll_canvas.bind("<Configure>", lambda e: self.scroll_canvas.itemconfigure(window_id, width=e.width))
+        self.scroll_canvas.configure(yscrollcommand=self.scrollbar.set)
+        self.scroll_canvas.bind_all("<MouseWheel>", lambda event: self.scroll_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units"))
+        self.scroll_canvas.pack(side="left", fill="both", expand=True)
+        self.scrollbar.pack(side="right", fill="y")
+
+        self.scrollable_frame.columnconfigure(0, weight=1)
+
+        self._populate_ui_moleculelist()  # TODO(TheTimebreaker): link this to the search; and then filter results based on input
+
+    def _populate_ui_moleculelist(self) -> None:
         def sort_molecules_by_name(molecules: dict[str, Molecule]) -> dict[str, Molecule]:
             def _sorter(items: tuple[str, Molecule]) -> Any:
                 trans = str.maketrans(
@@ -727,26 +756,12 @@ class Browse(ttk.Frame):
 
             return dict(sorted(molecules.items(), key=_sorter))
 
-        for child in self.winfo_children():
+        for child in self.scrollable_frame.winfo_children():
             child.destroy()
 
-        self.scroll_canvas = tk.Canvas(self, highlightthickness=0, borderwidth=0)
-        self.scrollbar = tk.Scrollbar(self, orient="vertical", command=self.scroll_canvas.yview)
-        self.scrollable_frame = tk.Frame(self.scroll_canvas)
-        self.scrollable_frame.bind("<Configure>", lambda _event: self.scroll_canvas.configure(scrollregion=self.scroll_canvas.bbox("all")))
+        molecules: dict[str, Molecule] = sort_molecules_by_name(self.parent.database.by_uuid)
 
-        window_id = self.scroll_canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
-        self.scroll_canvas.bind("<Configure>", lambda e: self.scroll_canvas.itemconfigure(window_id, width=e.width))
-        self.scroll_canvas.configure(yscrollcommand=self.scrollbar.set)
-        self.scroll_canvas.bind_all("<MouseWheel>", lambda event: self.scroll_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units"))
-        self.scroll_canvas.pack(side="left", fill="both", expand=True)
-        self.scrollbar.pack(side="right", fill="y")
-
-        self.scrollable_frame.columnconfigure(0, weight=1)
-
-        ordered_molecules: dict[str, Molecule] = sort_molecules_by_name(self.parent.database.by_uuid)
-
-        for i, (molecule_uuid, molecule) in enumerate(ordered_molecules.items()):
+        for i, (molecule_uuid, molecule) in enumerate(molecules.items()):
             print(molecule_uuid, molecule)
             ttk.Label(self.scrollable_frame, text=get_display_name(molecule)).grid(row=i, column=0, padx=self.padx, pady=self.pady, sticky="ew")
             ttk.Button(
