@@ -698,6 +698,35 @@ class Browse(ttk.Frame):
         self._build_ui()
 
     def _build_ui(self) -> None:
+        def sort_molecules_by_name(molecules: dict[str, Molecule]) -> dict[str, Molecule]:
+            def _sorter(items: tuple[str, Molecule]) -> Any:
+                trans = str.maketrans(
+                    {
+                        "0": "",
+                        "1": "",
+                        "2": "",
+                        "3": "",
+                        "4": "",
+                        "5": "",
+                        "6": "",
+                        "7": "",
+                        "8": "",
+                        "9": "",
+                        "-": "",
+                        "'": "",
+                        '"': "",
+                    }
+                )
+                if items[1].get("names", []):
+                    name = str(items[1].get("names", [])[0])  # type: ignore
+                    name = name.lower()
+                    name = name.translate(trans)
+                    return name
+                else:
+                    return items[1].get("cas", "")
+
+            return dict(sorted(molecules.items(), key=_sorter))
+
         for child in self.winfo_children():
             child.destroy()
 
@@ -715,7 +744,9 @@ class Browse(ttk.Frame):
 
         self.scrollable_frame.columnconfigure(0, weight=1)
 
-        for i, (molecule_uuid, molecule) in enumerate(self.parent.database.by_uuid.items()):
+        ordered_molecules: dict[str, Molecule] = sort_molecules_by_name(self.parent.database.by_uuid)
+
+        for i, (molecule_uuid, molecule) in enumerate(ordered_molecules.items()):
             print(molecule_uuid, molecule)
             ttk.Label(self.scrollable_frame, text=get_display_name(molecule)).grid(row=i, column=0, padx=self.padx, pady=self.pady, sticky="ew")
             ttk.Button(
