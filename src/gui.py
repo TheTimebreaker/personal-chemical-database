@@ -598,57 +598,6 @@ class View(AddMolecule):
         self.parent._toggle_view_off()
 
 
-class Search(ttk.Frame):
-    padx = 5
-    pady = 5
-
-    def __init__(
-        self,
-        master: ttk.Notebook | None = None,
-        *,
-        border: float | str | None = None,
-        borderwidth: float | str | None = None,
-        class_: Any = "",
-        cursor: Any = "",
-        height: int = 0,
-        name: str | None = None,
-        padding: (
-            float
-            | str
-            | tuple[float | str]
-            | tuple[float | str, float | str]
-            | tuple[float | str, float | str, float | str]
-            | tuple[float | str, float | str, float | str, float | str]
-            | None
-        ) = None,
-        relief: Literal["raised", "sunken", "flat", "ridge", "solid", "groove"] | None = None,
-        style: Any = "",
-        takefocus: Any = "",
-        width: int = 0,
-        parent: GUI,
-        root: tk.Tk,
-    ) -> None:
-        super().__init__(
-            master,
-            border=border,  # type: ignore
-            borderwidth=borderwidth,  # type: ignore
-            class_=class_,
-            cursor=cursor,
-            height=height,
-            name=name,  # type: ignore
-            padding=padding,  # type: ignore
-            relief=relief,  # type: ignore
-            style=style,
-            takefocus=takefocus,
-            width=width,
-        )
-        self.parent = parent
-        self.root = root
-        self._build_ui()
-
-    def _build_ui(self) -> None: ...
-
-
 class Browse(ttk.Frame):
     padx = 5
     pady = 5
@@ -709,6 +658,7 @@ class Browse(ttk.Frame):
         self.search_box.grid(column=1, row=0, sticky="ew", padx=self.padx, pady=self.pady)
         self.search.columnconfigure(1, weight=1)
         self.search.pack(fill="both", expand=True)
+        self.search_box.bind("<Key>", lambda _event: self._populate_ui_moleculelist())
 
         self.scroll_canvas = tk.Canvas(self, highlightthickness=0, borderwidth=0)
         self.scrollbar = tk.Scrollbar(self, orient="vertical", command=self.scroll_canvas.yview)
@@ -724,7 +674,7 @@ class Browse(ttk.Frame):
 
         self.scrollable_frame.columnconfigure(0, weight=1)
 
-        self._populate_ui_moleculelist()  # TODO(TheTimebreaker): link this to the search; and then filter results based on input
+        self._populate_ui_moleculelist()
 
     def _populate_ui_moleculelist(self) -> None:
         def sort_molecules_by_name(molecules: dict[str, Molecule]) -> dict[str, Molecule]:
@@ -744,6 +694,7 @@ class Browse(ttk.Frame):
                         "-": "",
                         "'": "",
                         '"': "",
+                        ",": "",
                     }
                 )
                 if items[1].get("names", []):
@@ -756,10 +707,25 @@ class Browse(ttk.Frame):
 
             return dict(sorted(molecules.items(), key=_sorter))
 
+        def filter_molecules_by_search(molecules: dict[str, Molecule]) -> dict[str, Molecule]:
+            search_term = self.search_var.get()
+            if not search_term:
+                return molecules
+
+            sorted_molecules: dict[str, Molecule] = {}
+            for uu, mol in molecules.items():
+                names = mol.get("names", [])
+                cas = mol.get("cas", "")
+                if any(search_term in name for name in [cas, *names]):  # type: ignore
+                    sorted_molecules[uu] = mol
+
+            return sorted_molecules
+
         for child in self.scrollable_frame.winfo_children():
             child.destroy()
 
         molecules: dict[str, Molecule] = sort_molecules_by_name(self.parent.database.by_uuid)
+        molecules = filter_molecules_by_search(molecules)
 
         for i, (molecule_uuid, molecule) in enumerate(molecules.items()):
             print(molecule_uuid, molecule)
@@ -831,7 +797,6 @@ class GUI(tk.Tk):
         self.add_molecule = AddMolecule(self.notebook, parent=self, root=self.root)
         self.edit_molecule = EditMolecule(self.notebook, parent=self, root=self.root)
         self.browse_tab = Browse(self.notebook, parent=self, root=self.root)
-        self.search_tab = Search(self.notebook, parent=self, root=self.root)
         self.view_tab = View(self.notebook, parent=self, root=self.root)
 
         self._build_ui()
@@ -840,7 +805,6 @@ class GUI(tk.Tk):
         self.notebook.pack(fill="both", expand=True)
         self.notebook.add(self.add_molecule, text="Add Molecule")
         self.notebook.add(self.browse_tab, text="Browse")
-        self.notebook.add(self.search_tab, text="Search")
 
     def _toggle_edit_on(self) -> None:
         self.notebook.add(self.edit_molecule, text="Edit Molecule")
