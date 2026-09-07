@@ -62,7 +62,7 @@ class AddMolecule(ttk.Frame):
         )
         self.parent = parent
         self.root = root
-        self.previous_tab: Browse | AddMolecule | EditMolecule | View | None = None
+        self.previous_tab: Browse | AddMolecule | EditMolecule | ViewMolecule | None = None
 
         self.inchi_var = tk.StringVar()
         self.inchikey_var = tk.StringVar()
@@ -216,7 +216,12 @@ class AddMolecule(ttk.Frame):
             else:
                 styl = ""
 
-            lab = ttk.Label(frame, text=f"#{data_uuid}-{data["data_type"]}", style=styl)
+            if data.get("frequency", None) and data.get("solvent", None):
+                label_text = f"#{i}-{data["data_type"]} ({data.get("frequency")} / {data.get("solvent")})"
+            else:
+                label_text = f"#{i}-{data["data_type"]}"
+
+            lab = ttk.Label(frame, text=label_text, style=styl)
             lab.bind("<Button-1>", lambda _event, data_uuid=data_uuid, data=data: self.open_data_dialog(data=data, data_uuid=data_uuid))  # type: ignore
             lab.grid(row=i, column=0, sticky="ew", padx=self.padx, pady=self.pady)
             if not self.viewer_mode:
@@ -583,7 +588,7 @@ class EditMolecule(AddMolecule):
         self.parent._toggle_edit_off()
 
 
-class View(AddMolecule):
+class ViewMolecule(AddMolecule):
     edit_state = "readonly"
     viewer_mode = True
 
@@ -797,7 +802,7 @@ class GUI(tk.Tk):
         self.add_molecule = AddMolecule(self.notebook, parent=self, root=self.root)
         self.edit_molecule = EditMolecule(self.notebook, parent=self, root=self.root)
         self.browse_tab = Browse(self.notebook, parent=self, root=self.root)
-        self.view_tab = View(self.notebook, parent=self, root=self.root)
+        self.view_tab = ViewMolecule(self.notebook, parent=self, root=self.root)
 
         self._build_ui()
 
