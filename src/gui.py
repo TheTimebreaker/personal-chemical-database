@@ -335,8 +335,6 @@ class AddMolecule(ttk.Frame):
         dialog = tk.Toplevel(self.root)
         dialog.title("Data details")
         dialog.transient(self.root)
-        dialog.wait_visibility()
-        dialog.grab_set()
         dialog.resizable(True, False)
 
         fields: dict[Literal["Type", "Solvent", "Frequency", "Data", "Source"], tk.StringVar] = {
@@ -352,7 +350,10 @@ class AddMolecule(ttk.Frame):
 
         dialog.bind("<Return>", lambda _: self._confirm_add_data(dialog, fields, data_uuid))
         dialog.columnconfigure(1, weight=1)
-        dialog.minsize(320, 0)
+        dialog.minsize(640, 0)
+
+        dialog.wait_visibility()
+        dialog.grab_set()
 
     def _remove_this_name(self, name: str) -> None:
         self._deleted_compound_names.append(name)
