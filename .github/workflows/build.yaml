@@ -81,12 +81,12 @@ jobs:
           - name: Run PyInstaller (Linux)
             if: runner.os == 'Linux'
             run: |
-              pyinstaller --distpath dist/default --workpath build/default scripts/build.spec
+              uv run pyinstaller --distpath dist/default --workpath build/default scripts/build.spec
               tar czf "${BUILD_ARTIFACT_DEFAULT}" -C dist/default/personal-chemical-database .
           - name: Run PyInstaller (Linux portable)
             if: runner.os == 'Linux'
             run: |
-              pyinstaller --distpath dist/portable --workpath build/portable scripts/build.spec -- --portable
+              uv run pyinstaller --distpath dist/portable --workpath build/portable scripts/build.spec -- --portable
               tar czf "${BUILD_ARTIFACT_PORTABLE}" -C dist/portable personal-chemical-database
           - name: Run PyInstaller (macOS)
             if: runner.os == 'macOS'
@@ -97,13 +97,13 @@ jobs:
             if: runner.os == 'Windows'
             shell: pwsh
             run: |
-              PyInstaller --distpath dist/default --workpath build/default scripts/build.spec
+              uv run PyInstaller --distpath dist/default --workpath build/default scripts/build.spec
               Compress-Archive -Path dist/default/personal-chemical-database -DestinationPath ${env:BUILD_ARTIFACT_DEFAULT}
           - name: Run PyInstaller (Windows portable)
             if: runner.os == 'Windows'
             shell: pwsh
             run: |
-              PyInstaller --distpath dist/portable --workpath build/portable scripts/personal-chemical-database.spec -- --portable
+              uv run PyInstaller --distpath dist/portable --workpath build/portable scripts/personal-chemical-database.spec -- --portable
               Compress-Archive -Path dist/portable/personal-chemical-database.exe -DestinationPath ${env:BUILD_ARTIFACT_PORTABLE}
       - parallel:
           - name: Upload build artifact
