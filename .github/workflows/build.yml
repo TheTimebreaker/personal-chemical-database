@@ -1,0 +1,143 @@
+name: Build
+
+on:
+  release:
+    types: created
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: sh
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            os-label: Linux x86
+
+          - os: macos-15-intel
+            os-label: macOS x86
+
+          - os: macos-15
+            os-label: macOS ARM
+
+          - os: windows-2022
+            os-label: Windows x86
+
+    name: ${{ matrix.os-label && format(' ({0})', matrix.os-label) }}
+    runs-on: ${{ matrix.os }}
+    env:
+      BUILD_PREFIX: tagstudio_${{ github.event.release.tag_name }}
+    steps:
+      - name: Prepare build (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $dir = "${env:RUNNER_TEMP}/upload"
+          New-Item -Path ${dir} -ItemType Directory -Force
+          $os = ${env:RUNNER_OS}.ToLower()
+          $arch = uname -m
+          $commonPath = "${dir}/${env:BUILD_PREFIX}_${os}_${arch}"
+          Add-Content -Path ${env:GITHUB_ENV} -Value @"
+          BUILD_ARTIFACT_DEFAULT=${commonPath}.zip
+          BUILD_ARTIFACT_PORTABLE=${commonPath}_portable.zip
+          "@ -Encoding utf8
+      - name: Prepare build (non-Windows)
+        if: runner.os != 'Windows'
+        run: |
+          dir=${RUNNER_TEMP}/upload
+          mkdir -p "${dir}"
+          os=$(
+              tr '[:upper:]' '[:lower:]' <<EOF
+          ${RUNNER_OS}
+          EOF
+          )
+          arch=$(uname -m)
+          common_path=${dir}/${BUILD_PREFIX}_${os}_${arch}
+          artifact_default=${common_path}.tar.gz
+          if [ "${RUNNER_OS}" = macOS ]; then
+              artifact_portable=
+          else
+              artifact_portable=${common_path}_portable.tar.gz
+          fi
+          cat <<EOF >>"${GITHUB_ENV}"
+          BUILD_ARTIFACT_DEFAULT=${artifact_default}
+          ${artifact_portable:+BUILD_ARTIFACT_PORTABLE=${artifact_portable}}
+          EOF
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Python
+        uses: ./.github/actions/setup-python
+        with:
+          groups: build
+
+      - parallel:
+          - name: Run PyInstaller (Linux)
+            if: runner.os == 'Linux'
+            run: |
+              pyinstaller --distpath dist/default --workpath build/default scripts/build.spec
+              tar czf "${BUILD_ARTIFACT_DEFAULT}" -C dist/default/personal-chemical-database .
+          - name: Run PyInstaller (Linux portable)
+            if: runner.os == 'Linux'
+            run: |
+              pyinstaller --distpath dist/portable --workpath build/portable scripts/build.spec -- --portable
+              tar czf "${BUILD_ARTIFACT_PORTABLE}" -C dist/portable personal-chemical-database
+          - name: Run PyInstaller (macOS)
+            if: runner.os == 'macOS'
+            run: |
+              scripts/build.spec
+              tar czf "${BUILD_ARTIFACT_DEFAULT}" -C dist Personal-Chemical-Database.app
+          - name: Run PyInstaller (Windows)
+            if: runner.os == 'Windows'
+            shell: pwsh
+            run: |
+              PyInstaller --distpath dist/default --workpath build/default scripts/build.spec
+              Compress-Archive -Path dist/default/personal-chemical-database -DestinationPath ${env:BUILD_ARTIFACT_DEFAULT}
+          - name: Run PyInstaller (Windows portable)
+            if: runner.os == 'Windows'
+            shell: pwsh
+            run: |
+              PyInstaller --distpath dist/portable --workpath build/portable scripts/personal-chemical-database.spec -- --portable
+              Compress-Archive -Path dist/portable/personal-chemical-database.exe -DestinationPath ${env:BUILD_ARTIFACT_PORTABLE}
+      - parallel:
+          - name: Upload build artifact
+            uses: actions/upload-artifact@v7
+            with:
+              path: ${{ env.BUILD_ARTIFACT_DEFAULT }}
+              if-no-files-found: error
+              # Short retention for 'Pre-Release' and 'Release' because they get uploaded to a GitHub release
+              archive: false
+
+          - name: Upload build artifact (portable)
+            if: env.BUILD_ARTIFACT_PORTABLE != ''
+            uses: actions/upload-artifact@v7
+            with:
+              path: ${{ env.BUILD_ARTIFACT_PORTABLE }}
+              if-no-files-found: error
+              archive: false
+
+  upload:
+    permissions:
+      contents: write
+
+    name: Upload Builds to Release
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: ${{ runner.temp }}/download
+          merge-multiple: 'true'
+          skip-decompress: 'true'
+
+      - name: Upload build artifacts to release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: ${{ runner.temp }}/download/*
