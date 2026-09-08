@@ -31,7 +31,7 @@ runs:
 
         uv sync ${groupArgs}
 
-    - name: Run pip install (non-Windows)
+    - name: Run uv sync (non-Windows)
       if: runner.os != 'Windows'
       env:
         INPUT_GROUPS: ${{ inputs.groups }}
@@ -47,4 +47,4 @@ runs:
             done <<<"${INPUT_GROUPS}"
         fi
 
-        uv pip install . "${extra_args[@]}"
+        uv sync "${extra_args[@]}"
