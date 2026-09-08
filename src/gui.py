@@ -170,9 +170,9 @@ class AddMolecule(ttk.Frame):
             marked_for_deletion = name in self._deleted_compound_names
             marked_as_new = name in self._new_compound_names
             if marked_for_deletion:
-                styl = "Red.TLabel"
+                styl = "Deleted.TLabel"
             elif marked_as_new:
-                styl = "Green.TLabel"
+                styl = "New.TLabel"
             else:
                 styl = ""
 
