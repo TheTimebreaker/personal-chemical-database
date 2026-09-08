@@ -23,7 +23,7 @@ tcl_lib = os.path.join(UV_LIB, "libtcl9.0.so")
 tk_lib = os.path.join(UV_LIB, "libtcl9tk9.0.so")
 
 a = Analysis(
-    ['./src/main.py'],
+    ['../src/main.py'],
     pathex=[],
     binaries=[
         (tcl_lib, "."),
