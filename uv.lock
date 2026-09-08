@@ -320,7 +320,7 @@ dependencies = [
 ]
 
 [package.dev-dependencies]
-compile = [
+build = [
     { name = "pyinstaller" },
 ]
 dev = [
@@ -340,7 +340,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-compile = [{ name = "pyinstaller" }]
+build = [{ name = "pyinstaller" }]
 dev = [
     { name = "black", specifier = "~=26.5.1" },
     { name = "mypy", specifier = "~=2.1.0" },
