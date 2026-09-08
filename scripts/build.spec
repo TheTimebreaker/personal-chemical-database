@@ -50,7 +50,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name=f'personal-chemical-database_{version}',
+    name='personal-chemical-database',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

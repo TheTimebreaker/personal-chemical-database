@@ -74,7 +74,7 @@ jobs:
             if: runner.os == 'Linux'
             run: |
               uv run pyinstaller --distpath dist/default --workpath build/default scripts/build.spec
-              tar czf "${BUILD_ARTIFACT_DEFAULT}" -C dist/default/personal-chemical-database .
+              tar czf "${BUILD_ARTIFACT_DEFAULT}" -C dist/default .
       
       - parallel:
           - name: Upload build artifact
