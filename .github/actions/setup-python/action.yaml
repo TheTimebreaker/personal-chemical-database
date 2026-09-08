@@ -48,3 +48,15 @@ runs:
         fi
 
         uv sync "${extra_args[@]}"
+        
+    - name: Enable venv (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        .venv/Scripts/enable
+
+    - name: Enable venv (non-Windows)
+      if: runner.os != 'Windows'
+      shell: bash
+      run: |
+        source ./.venv/bin/activate
