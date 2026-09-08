@@ -357,6 +357,8 @@ class AddMolecule(ttk.Frame):
 
     def _remove_this_name(self, name: str) -> None:
         self._deleted_compound_names.append(name)
+        if name in self._new_compound_names:
+            self._new_compound_names.remove(name)
         self._update_compound_names()
 
     def _remove_this_name_undo(self, name: str) -> None:
@@ -387,8 +389,11 @@ class AddMolecule(ttk.Frame):
     def _confirm_add_name(self, dialog: tk.Toplevel, entry_var: tk.StringVar) -> None:
         value = entry_var.get().strip()
         if value:
-            self.compound_names_var.append(value)
+            if value not in self.compound_names_var:
+                self.compound_names_var.append(value)
             self._new_compound_names.append(value)
+            if value in self._deleted_compound_names:
+                self._deleted_compound_names.remove(value)
             self._update_compound_names()
             dialog.destroy()
         else:
