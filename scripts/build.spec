@@ -26,8 +26,8 @@ a = Analysis(
     ['../src/main.py'],
     pathex=[],
     binaries=[
-        (tcl_lib, "."),
-        (tk_lib, "."),
+        #(tcl_lib, "."),
+        #(tk_lib, "."),
     ],
     datas=[],
     hiddenimports=["PIL._tkinter_finder", "PIL._imagingtk"],
