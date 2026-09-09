@@ -4,8 +4,9 @@ import argparse
 import platform
 from tomllib import load
 
-from PyInstaller.building.api import BUNDLE, COLLECT, EXE, PYZ
+from PyInstaller.building.api import COLLECT, EXE, PYZ
 from PyInstaller.building.build_main import Analysis
+from PyInstaller.building.osx import BUNDLE
 
 # Parsing the "portable" arg
 parser = argparse.ArgumentParser()
