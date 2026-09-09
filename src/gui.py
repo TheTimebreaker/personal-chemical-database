@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import tkinter as tk
 from tkinter import messagebox, ttk
@@ -10,7 +12,7 @@ from rdkit.Chem import Draw
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 from database import Database, Molecule, MoleculeData, NMRData, generate_molecule_data, get_display_name
-from style import configure_ttk_style
+from style import configure_ttk_style, style_root
 
 
 class AddMolecule(ttk.Frame):
@@ -655,9 +657,40 @@ class Browse(ttk.Frame):
         )
         self.parent = parent
         self.root = root
+        self._wheel_delta = 0
         self._build_ui()
 
     def _build_ui(self) -> None:
+        def _on_mousewheel(event: Any) -> Literal["break"]:
+            self._wheel_delta += event.delta
+            steps = int(self._wheel_delta / 120)
+            if steps:
+                self.scroll_canvas.yview_scroll(-steps, "units")
+                self._wheel_delta -= steps * 120
+            return "break"
+
+        def _on_touchpad_scroll(event: Any) -> Literal["break"]:
+            _delta_x, delta_y = self.scroll_canvas.tk.splitlist(
+                self.scroll_canvas.tk.call(
+                    "tk::PreciseScrollDeltas",
+                    event.delta,
+                )
+            )
+            delta_y = int(delta_y)
+            if delta_y:
+                self.scroll_canvas.yview_scroll(
+                    -1 if delta_y > 0 else 1,
+                    "units",
+                )
+            return "break"
+
+        def _on_linux_wheel(event: Any) -> Literal["break"]:
+            if event.num == 4:
+                self.scroll_canvas.yview_scroll(-1, "units")
+            elif event.num == 5:
+                self.scroll_canvas.yview_scroll(1, "units")
+            return "break"
+
         for child in self.winfo_children():
             child.destroy()
 
@@ -679,7 +712,20 @@ class Browse(ttk.Frame):
         window_id = self.scroll_canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
         self.scroll_canvas.bind("<Configure>", lambda e: self.scroll_canvas.itemconfigure(window_id, width=e.width))
         self.scroll_canvas.configure(yscrollcommand=self.scrollbar.set)
-        self.scroll_canvas.bind_all("<MouseWheel>", lambda event: self.scroll_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units"))
+        self.scroll_canvas.bind_all("<MouseWheel>", _on_mousewheel)
+
+        # added in tcl9.0, but not all platforms have builds for that yet
+        try:
+            self.scroll_canvas.bind_all(
+                "<TouchpadScroll>",
+                _on_touchpad_scroll,
+            )
+        except tk.TclError:
+            pass
+
+        self.scroll_canvas.bind_all("<Button-4>", _on_linux_wheel)
+        self.scroll_canvas.bind_all("<Button-5>", _on_linux_wheel)
+
         self.scroll_canvas.pack(side="left", fill="both", expand=True)
         self.scrollbar.pack(side="right", fill="y")
 
@@ -840,6 +886,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
     root = tk.Tk()
+    style_root(root)
     configure_ttk_style()
-    g = GUI(root)
+    GUI(root)
     tk.mainloop()

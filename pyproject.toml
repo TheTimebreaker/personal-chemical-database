@@ -4,7 +4,7 @@ dynamic=["version"]
 description="A personal, self-hosted database format and GUI for organizing your own data"
 authors=[{name="TheTimebreaker"}]
 readme="README.md"
-requires-python=">=3.14"
+requires-python=">=3.13"
 dependencies = [
   "rdkit~=2026.3.3",
   "pubchempy~=1.0.5",
