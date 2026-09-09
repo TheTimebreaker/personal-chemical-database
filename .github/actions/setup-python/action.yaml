@@ -53,7 +53,7 @@ runs:
       if: runner.os == 'Windows'
       shell: pwsh
       run: |
-        .venv/Scripts/enable
+        .venv/Scripts/activate
 
     - name: Enable venv (non-Windows)
       if: runner.os != 'Windows'
