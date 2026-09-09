@@ -719,13 +719,13 @@ class Browse(ttk.Frame):
             return dict(sorted(molecules.items(), key=_sorter))
 
         def filter_molecules_by_search(molecules: dict[str, Molecule]) -> dict[str, Molecule]:
-            search_term = self.search_var.get()
+            search_term = self.search_var.get().strip().lower()
             if not search_term:
                 return molecules
 
             sorted_molecules: dict[str, Molecule] = {}
             for uu, mol in molecules.items():
-                names = mol.get("names", [])
+                names = [name.lower() for name in mol.get("names", [])]  # type: ignore
                 cas = mol.get("cas", "")
                 if any(search_term in name for name in [cas, *names]):  # type: ignore
                     sorted_molecules[uu] = mol
