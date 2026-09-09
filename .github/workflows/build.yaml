@@ -88,7 +88,7 @@ jobs:
           - name: Run PyInstaller (macOS)
             if: runner.os == 'macOS'
             run: |
-              scripts/build.spec
+              uv run pyinstaller scripts/build.spec
               tar czf "${BUILD_ARTIFACT_DEFAULT}" -C dist Personal-Chemical-Database.app
       
       - parallel:
