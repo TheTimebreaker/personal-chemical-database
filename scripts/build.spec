@@ -1,3 +1,5 @@
+#!/usr/bin/env -S uv run PyInstaller
+
 import argparse
 import os
 import sys
