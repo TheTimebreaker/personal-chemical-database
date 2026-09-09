@@ -669,7 +669,7 @@ class Browse(ttk.Frame):
         self.search_box.grid(column=1, row=0, sticky="ew", padx=self.padx, pady=self.pady)
         self.search.columnconfigure(1, weight=1)
         self.search.pack(fill="both", expand=True)
-        self.search_box.bind("<Key>", lambda _event: self._populate_ui_moleculelist())
+        self.search_box.bind("<KeyRelease>", lambda _event: self._populate_ui_moleculelist())
 
         self.scroll_canvas = tk.Canvas(self, highlightthickness=0, borderwidth=0)
         self.scrollbar = tk.Scrollbar(self, orient="vertical", command=self.scroll_canvas.yview)
