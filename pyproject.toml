@@ -25,6 +25,8 @@ build = [
     "pyinstaller",
 ]
 
+[tool.uv]
+python-preference = "only-managed"
 
 [tool.ruff]
 line-length = 150
