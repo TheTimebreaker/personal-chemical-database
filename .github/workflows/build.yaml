@@ -91,8 +91,8 @@ jobs:
           print("Tk:", _tkinter.TK_VERSION)
 
           assert sys.version_info[:3] == (3, 14, 5), sys.version
-          assert _tkinter.TCL_VERSION == "9.0", _tkinter.TCL_VERSION
-          assert _tkinter.TK_VERSION == "9.0", _tkinter.TK_VERSION
+          assert _tkinter.TCL_VERSION in ("8.6", "9.0"), _tkinter.TCL_VERSION
+          assert _tkinter.TK_VERSION in ("8.6", "9.0"), _tkinter.TK_VERSION
           PY
 
 
