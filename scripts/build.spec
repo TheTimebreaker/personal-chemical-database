@@ -1,5 +1,3 @@
-#!/usr/bin/env -S uv run PyInstaller
-
 import argparse
 import platform
 from tomllib import load
