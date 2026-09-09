@@ -22,6 +22,9 @@ jobs:
 
           - os: macos-15
             os-label: macOS ARM
+
+          - os: macos-15-intel
+            os-label: macOS x86
             
 
     name: ${{ matrix.os-label && format(' ({0})', matrix.os-label) }}
