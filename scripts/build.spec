@@ -1,16 +1,23 @@
 #!/usr/bin/env -S uv run PyInstaller
 
 import argparse
-import os
-import sys
+import platform
+from tomllib import load
 
-from PyInstaller.building.api import COLLECT, EXE, PYZ
+from PyInstaller.building.api import BUNDLE, COLLECT, EXE, PYZ
 from PyInstaller.building.build_main import Analysis
 
 # Parsing the "portable" arg
 parser = argparse.ArgumentParser()
 parser.add_argument("--portable", action="store_true")
 options = parser.parse_args()
+
+with open("pyproject.toml", "rb") as file:
+    pyproject = load(file)["project"]
+
+system = platform.system()
+name = pyproject["name"]
+ICON = None
 
 
 a = Analysis(
@@ -36,7 +43,7 @@ exe = EXE(
     *include,
     [],
     exclude_binaries=not options.portable,
-    name="personal-chemical-database",
+    name=name,
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -59,6 +66,19 @@ coll = (
         strip=False,
         upx=True,
         upx_exclude=[],
-        name="personal-chemical-database",
+        name=name,
     )
 )
+
+if platform.system() == "Darwin":
+    app = BUNDLE(
+        exe if coll is None else coll,
+        name=f"{name}.app",
+        icon=ICON,
+        bundle_identifier="com.thetimebreaker.personalchemicaldatabase",
+        version="v1.0.0",  # TODO(TheTimebreaker): make dynamic if this works
+        info_plist={
+            "NSAppleScriptEnabled": False,
+            "NSPrincipalClass": "NSApplication",
+        },
+    )
