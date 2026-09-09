@@ -74,8 +74,13 @@ jobs:
             if: runner.os == 'Linux'
             run: |
               uv run pyinstaller --distpath dist/default --workpath build/default scripts/build.spec
-              tar czvf "${BUILD_ARTIFACT_DEFAULT}" -C dist/default .
-              ls
+              tar czf "${BUILD_ARTIFACT_DEFAULT}" -C dist/default/personal-chemical-database .
+
+          - name: Run PyInstaller (Linux portable)
+            if: runner.os == 'Linux'
+            run: |
+              uv run pyinstaller --distpath dist/portable --workpath build/portable scripts/build.spec -- --portable
+              tar czf "${BUILD_ARTIFACT_PORTABLE}" -C dist/portable personal-chemical-database
       
       - parallel:
           - name: Upload build artifact
