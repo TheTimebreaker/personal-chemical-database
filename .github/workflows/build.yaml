@@ -99,12 +99,12 @@ jobs:
             run: |
               uv run PyInstaller --distpath dist/default --workpath build/default scripts/build.spec
               Compress-Archive -Path dist/default/personal-chemical-database -DestinationPath ${env:BUILD_ARTIFACT_DEFAULT}
-              
+
           - name: Run PyInstaller (Windows portable)
             if: runner.os == 'Windows'
             shell: pwsh
             run: |
-              uv run PyInstaller --distpath dist/portable --workpath build/portable scripts/personal-chemical-database.spec -- --portable
+              uv run PyInstaller --distpath dist/portable --workpath build/portable scripts/build.spec -- --portable
               Compress-Archive -Path dist/portable/personal-chemical-database.exe -DestinationPath ${env:BUILD_ARTIFACT_PORTABLE}
 
 
