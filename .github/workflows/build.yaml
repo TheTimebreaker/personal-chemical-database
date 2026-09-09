@@ -20,9 +20,6 @@ jobs:
           - os: ubuntu-22.04
             os-label: Linux x86
 
-          - os: macos-15-intel
-            os-label: macOS x86
-
           - os: macos-15
             os-label: macOS ARM
             
