@@ -11,20 +11,13 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Setup uv install
+    - name: Set up Python
+      uses: actions/setup-python@v7
+      with:
+        python-version-file: ".python-version"
+
+    - name: Install UV
       uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
-
-    - name: Install Python (Windows)
-      if: runner.os == 'Windows'
-      shell: pwsh
-      run: |
-        uv python install
-
-    - name: Install Python (non-Windows)
-      if: runner.os != 'Windows'
-      shell: bash
-      run: |
-        uv python install
 
     - name: Install Dependencies (Windows)
       if: runner.os == 'Windows'
@@ -36,7 +29,7 @@ runs:
             $groupArgs = -split ${env:INPUT_GROUPS} -replace '^', '--group='
         }
 
-        uv sync --locked ${groupArgs}
+        uv sync --locked --no-managed-python ${groupArgs}
 
     - name: Install Dependencies (non-Windows)
       if: runner.os != 'Windows'
@@ -54,7 +47,7 @@ runs:
             done <<<"${INPUT_GROUPS}"
         fi
 
-        uv sync --locked "${extra_args[@]}"
+        uv sync --locked --no-managed-python "${extra_args[@]}"
         
     - name: Enable venv (Windows)
       if: runner.os == 'Windows'
