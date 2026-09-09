@@ -38,6 +38,8 @@ exclude = [
   "__pycache__",
   "__init__.py",
 ]
+extension = { spec = "python" }
+
 [tool.ruff.lint]
 select = [
   "E",   # pycodestyle (errors)
@@ -80,6 +82,7 @@ ignore-paths = [".venv"]
 [tool.black]
 line-length = 150
 target-version = ["py314"]
+include = '\.(pyi?|spec)$'
 
 
 [tool.mypy]

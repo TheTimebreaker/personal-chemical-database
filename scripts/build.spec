@@ -1,5 +1,6 @@
 import argparse
 import platform
+import subprocess
 from tomllib import load
 
 from PyInstaller.building.api import COLLECT, EXE, PYZ
@@ -17,7 +18,10 @@ with open("pyproject.toml", "rb") as file:
 system = platform.system()
 name = pyproject["name"]
 ICON = None
+VERSION = subprocess.check_output(["git", "describe", "--tags", "--abbrev=0"]).decode().strip()
 
+if not VERSION:
+    raise ValueError("extracted git version was false, thats illegal.")
 
 a = Analysis(
     ["../src/main.py"],
@@ -75,7 +79,7 @@ if platform.system() == "Darwin":
         name=f"{name}.app",
         icon=ICON,
         bundle_identifier="com.thetimebreaker.personalchemicaldatabase",
-        version="v1.0.0",  # TODO(TheTimebreaker): make dynamic if this works
+        version=VERSION,
         info_plist={
             "NSAppleScriptEnabled": False,
             "NSPrincipalClass": "NSApplication",
