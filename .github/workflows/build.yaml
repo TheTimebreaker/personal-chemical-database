@@ -81,6 +81,12 @@ jobs:
             run: |
               uv run pyinstaller --distpath dist/portable --workpath build/portable scripts/build.spec -- --portable
               tar czf "${BUILD_ARTIFACT_PORTABLE}" -C dist/portable personal-chemical-database
+
+          - name: Run PyInstaller (macOS)
+            if: runner.os == 'macOS'
+            run: |
+              scripts/build.spec
+              tar czf "${BUILD_ARTIFACT_DEFAULT}" -C dist Personal-Chemical-Database.app
       
       - parallel:
           - name: Upload build artifact
