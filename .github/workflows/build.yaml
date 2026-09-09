@@ -74,6 +74,14 @@ jobs:
         with:
           groups: build
 
+      - name: Show build versions
+        run: |
+          uv run python -c "import sys, _tkinter; print('Python:', sys.version); print('Tcl:', _tkinter.TCL_VERSION); print('Tk:', _tkinter.TK_VERSION)"
+          uv run python -m PyInstaller --version
+
+
+
+
       - parallel:
           - name: Run PyInstaller (Linux)
             if: runner.os == 'Linux'
