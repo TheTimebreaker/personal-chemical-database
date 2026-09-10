@@ -1,0 +1,1 @@
+graceful fallback if no config file/dir or no db file/dir is found
