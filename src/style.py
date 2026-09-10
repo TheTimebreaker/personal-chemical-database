@@ -3,7 +3,7 @@ import tkinter.font as tkfont
 from tkinter import ttk
 
 
-def style_root(root: tk.Tk) -> None:
+def _fonts() -> None:
     sans_fonts = (
         "TkDefaultFont",
         "TkTextFont",
@@ -25,6 +25,10 @@ def style_root(root: tk.Tk) -> None:
         tkfont.nametofont("TkFixedFont").configure(family="monospace")
     except tk.TclError:
         pass
+
+
+def style_root(root: tk.Tk) -> None:
+    _fonts()
 
 
 def configure_ttk_style() -> None:
