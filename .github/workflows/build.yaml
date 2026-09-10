@@ -74,37 +74,55 @@ jobs:
         with:
           groups: build
 
+
+      - name: Verify build runtime
+        run: |
+          uv run --no-managed-python python - <<'PY'
+          import sys
+          import _tkinter
+
+          print("Python:", sys.version)
+          print("Python executable:", sys.executable)
+          print("Tcl:", _tkinter.TCL_VERSION)
+          print("Tk:", _tkinter.TK_VERSION)
+
+          assert sys.version_info[:3] == (3, 14, 5), sys.version
+          assert _tkinter.TCL_VERSION in ("8.6", "9.0"), _tkinter.TCL_VERSION
+          assert _tkinter.TK_VERSION in ("8.6", "9.0"), _tkinter.TK_VERSION
+          PY
+
+
       - parallel:
           - name: Run PyInstaller (Linux)
             if: runner.os == 'Linux'
             run: |
-              uv run pyinstaller --distpath dist/default --workpath build/default scripts/build.spec
+              uv run --no-managed-python pyinstaller --distpath dist/default --workpath build/default scripts/build.spec
               tar czf "${BUILD_ARTIFACT_DEFAULT}" -C dist/default/personal-chemical-database .
 
           - name: Run PyInstaller (Linux portable)
             if: runner.os == 'Linux'
             run: |
-              uv run pyinstaller --distpath dist/portable --workpath build/portable scripts/build.spec -- --portable
+              uv run --no-managed-python pyinstaller --distpath dist/portable --workpath build/portable scripts/build.spec -- --portable
               tar czf "${BUILD_ARTIFACT_PORTABLE}" -C dist/portable personal-chemical-database
 
           - name: Run PyInstaller (macOS)
             if: runner.os == 'macOS'
             run: |
-              uv run pyinstaller scripts/build.spec
+              uv run --no-managed-python pyinstaller scripts/build.spec
               tar czf "${BUILD_ARTIFACT_DEFAULT}" -C dist Personal-Chemical-Database.app
 
           - name: Run PyInstaller (Windows)
             if: runner.os == 'Windows'
             shell: pwsh
             run: |
-              uv run PyInstaller --distpath dist/default --workpath build/default scripts/build.spec
+              uv run --no-managed-python PyInstaller --distpath dist/default --workpath build/default scripts/build.spec
               Compress-Archive -Path dist/default/personal-chemical-database -DestinationPath ${env:BUILD_ARTIFACT_DEFAULT}
 
           - name: Run PyInstaller (Windows portable)
             if: runner.os == 'Windows'
             shell: pwsh
             run: |
-              uv run PyInstaller --distpath dist/portable --workpath build/portable scripts/build.spec -- --portable
+              uv run --no-managed-python PyInstaller --distpath dist/portable --workpath build/portable scripts/build.spec -- --portable
               Compress-Archive -Path dist/portable/personal-chemical-database.exe -DestinationPath ${env:BUILD_ARTIFACT_PORTABLE}
 
 

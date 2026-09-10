@@ -4,7 +4,7 @@ dynamic=["version"]
 description="A personal, self-hosted database format and GUI for organizing your own data"
 authors=[{name="TheTimebreaker"}]
 readme="README.md"
-requires-python=">=3.14"
+requires-python=">=3.13"
 dependencies = [
   "rdkit~=2026.3.3",
   "pubchempy~=1.0.5",
@@ -25,6 +25,8 @@ build = [
     "pyinstaller",
 ]
 
+[tool.uv]
+python-preference = "only-managed"
 
 [tool.ruff]
 line-length = 150
@@ -36,6 +38,8 @@ exclude = [
   "__pycache__",
   "__init__.py",
 ]
+extension = { spec = "python" }
+
 [tool.ruff.lint]
 select = [
   "E",   # pycodestyle (errors)
@@ -78,6 +82,7 @@ ignore-paths = [".venv"]
 [tool.black]
 line-length = 150
 target-version = ["py314"]
+include = '\.(pyi?|spec)$'
 
 
 [tool.mypy]
