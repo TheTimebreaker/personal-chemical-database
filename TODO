@@ -1,0 +1,8 @@
+todo: dark mode
+add tests to github actions
+add tests to compiled releases
+find way of checking MacOS
+MacOS intel maybe???
+AppImage releases
+
+graceful fallback if no config file/dir or no db file/dir is found

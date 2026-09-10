@@ -702,7 +702,7 @@ class Browse(ttk.Frame):
         self.search_box.grid(column=1, row=0, sticky="ew", padx=self.padx, pady=self.pady)
         self.search.columnconfigure(1, weight=1)
         self.search.pack(fill="both", expand=True)
-        self.search_box.bind("<Key>", lambda _event: self._populate_ui_moleculelist())
+        self.search_box.bind("<KeyRelease>", lambda _event: self._populate_ui_moleculelist())
 
         self.scroll_canvas = tk.Canvas(self, highlightthickness=0, borderwidth=0)
         self.scrollbar = tk.Scrollbar(self, orient="vertical", command=self.scroll_canvas.yview)
@@ -765,13 +765,13 @@ class Browse(ttk.Frame):
             return dict(sorted(molecules.items(), key=_sorter))
 
         def filter_molecules_by_search(molecules: dict[str, Molecule]) -> dict[str, Molecule]:
-            search_term = self.search_var.get()
+            search_term = self.search_var.get().strip().lower()
             if not search_term:
                 return molecules
 
             sorted_molecules: dict[str, Molecule] = {}
             for uu, mol in molecules.items():
-                names = mol.get("names", [])
+                names = [name.lower() for name in mol.get("names", [])]  # type: ignore
                 cas = mol.get("cas", "")
                 if any(search_term in name for name in [cas, *names]):  # type: ignore
                     sorted_molecules[uu] = mol
