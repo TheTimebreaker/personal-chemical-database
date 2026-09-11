@@ -132,7 +132,6 @@ jobs:
             with:
               path: ${{ env.BUILD_ARTIFACT_DEFAULT }}
               if-no-files-found: error
-              # Short retention for 'Pre-Release' and 'Release' because they get uploaded to a GitHub release
               archive: false
 
           - name: Upload build artifact (portable)
