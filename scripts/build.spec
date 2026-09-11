@@ -2,6 +2,7 @@ import argparse
 import platform
 import subprocess
 from tomllib import load
+from pathlib import Path
 
 from PyInstaller.building.api import COLLECT, EXE, PYZ
 from PyInstaller.building.build_main import Analysis
@@ -17,7 +18,12 @@ with open("pyproject.toml", "rb") as file:
 
 system = platform.system()
 name = pyproject["name"]
-ICON = None
+if system == "Windows":
+    ICON = (Path(".") / "img" / "icon-Win.ico").resolve()
+elif system == "Darwin":
+    ICON = (Path(".") / "img" / "icon-Mac.icns").resolve()
+else: #Linux doesn't use built-into-EXE icons
+    ICON = None
 VERSION = subprocess.check_output(["git", "describe", "--tags", "--abbrev=0"]).decode().strip()
 
 if not VERSION:
@@ -47,6 +53,7 @@ exe = EXE(
     [],
     exclude_binaries=not options.portable,
     name=name,
+    icon=ICON,
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
