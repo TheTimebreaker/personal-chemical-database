@@ -1,5 +1,4 @@
 import argparse
-import time
 import logging
 import socket
 import tkinter as tk
@@ -11,7 +10,7 @@ from style import configure_ttk_style, style_root
 def signal_ready(port: int) -> None:
     with socket.create_connection(("127.0.0.1", port)) as sock:
         print("READY!")
-        sock.sendall(b"READY\n")
+        sock.sendall(b"READY")
 
 
 def main() -> None:
