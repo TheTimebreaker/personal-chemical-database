@@ -189,7 +189,7 @@ jobs:
           [Desktop Entry]
           Name=Personal Chemical Database
           Exec=$APP_NAME
-          Icon=$APP_NAME
+          # Icon=$APP_NAME
           Type=Application
           Categories=Utility;
           EOF
