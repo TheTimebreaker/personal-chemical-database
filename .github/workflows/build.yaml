@@ -30,9 +30,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       BUILD_PREFIX: personal-chemical-database_${{ github.event.release.tag_name }}
-    outputs:
-      build-artifact-default: ${{ env.BUILD_ARTIFACT_DEFAULT }}
-      build-artifact-portable: ${{ env.BUILD_ARTIFACT_PORTABLE }}
     steps:
       - name: Prepare build (Windows)
         if: runner.os == 'Windows'
@@ -159,23 +156,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Download build artifacts
-        uses: actions/download-artifact@v8
-        with:
-          path: ${{ runner.temp }}/artifacts
-        
       - parallel:
           - name: Test executable (Windows)
             if: runner.os == 'Windows'
             shell: pwsh
             run: |
-              .\tests\test-windows-exe.ps1 -ExecutablePath "${{ needs.build.outputs.build-artifact-default }}"
+              .\tests\test-windows-exe.ps1 -ExecutablePath "dist/default/personal-chemical-database/personal-chemical-database.exe"
 
           - name: Test executable (Windows portable)
             if: runner.os == 'Windows'
             shell: pwsh
             run: |
-              .\tests\test-windows-exe.ps1 -ExecutablePath "${{ needs.build.outputs.build-artifact-portable }}"
+              .\tests\test-windows-exe.ps1 -ExecutablePath "dist/portable/personal-chemical-database.exe"
 
 
   upload:
