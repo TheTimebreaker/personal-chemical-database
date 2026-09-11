@@ -61,10 +61,12 @@ jobs:
               artifact_portable=
           else
               artifact_portable=${common_path}_portable.tar.gz
+              artifact_appimage=${common_path}.AppImage
           fi
           cat <<EOF >>"${GITHUB_ENV}"
           BUILD_ARTIFACT_DEFAULT=${artifact_default}
           ${artifact_portable:+BUILD_ARTIFACT_PORTABLE=${artifact_portable}}
+          ${artifact_appimage:+BUILD_ARTIFACT_APPIMAGE=${artifact_appimage}}
           EOF
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -98,6 +100,7 @@ jobs:
           run: |
             uv run --no-managed-python pyinstaller --distpath dist/default --workpath build/default scripts/build.spec
             echo "REGULAR_EXE_PATH=./dist/default/personal-chemical-database/personal-chemical-database" >> "$GITHUB_ENV"
+            echo "REGULAR_EXE_DIR=./dist/default/personal-chemical-database/" >> "$GITHUB_ENV"
             tar czf "${BUILD_ARTIFACT_DEFAULT}" -C dist/default/personal-chemical-database .
 
         - name: Run PyInstaller (Linux portable)
@@ -154,6 +157,52 @@ jobs:
           run: |
             python3 ./tests/test_executable.py $PORTABLE_EXE_PATH
 
+      - name: Compile Linux AppImage
+        if: runner.os == 'Linux'
+        run: |
+          set -eu
+
+          APP_NAME="personal-chemical-database"
+          APP_DIR="$REGULAR_EXE_DIR"
+          APPIMAGE_DIR="$RUNNER_TEMP/${APP_NAME}.AppDir"
+
+          mkdir -p "$APPIMAGE_DIR/usr/bin/$APP_NAME"
+          cp -a "$APP_DIR/." "$APPIMAGE_DIR/usr/bin/$APP_NAME/"
+          cp ./img/icon-linux.png "$APPIMAGE_DIR/$APP_NAME.png"
+
+          APPIMAGETOOL="${RUNNER_TEMP}/appimagetool-x86_64.AppImage"
+          curl -fsSL \
+            -o "$APPIMAGETOOL" \
+            "https://github.com/AppImage/appimagetool/releases/latest/download/appimagetool-x86_64.AppImage"
+          chmod +x "$APPIMAGETOOL"
+          
+
+          # AppImage launcher
+          cat > "$APPIMAGE_DIR/AppRun" <<EOF
+          #!/bin/sh
+          HERE="\$(dirname "\$(readlink -f "\$0")")"
+          exec "\$HERE/usr/bin/$APP_NAME/$APP_NAME" "\$@"
+          EOF
+          chmod +x "$APPIMAGE_DIR/AppRun"
+
+          find "$APPIMAGE_DIR" -name "*.desktop" -print
+
+          # Desktop entry
+          cat > "$APPIMAGE_DIR/$APP_NAME.desktop" <<EOF
+          [Desktop Entry]
+          Name=Personal Chemical Database
+          Exec=$APP_NAME
+          Type=Application
+          Categories=Utility;
+          Icon=$APP_NAME
+          EOF
+
+          echo "=== Desktop file ==="
+          cat "$APPIMAGE_DIR/personal-chemical-database.desktop"
+          echo "===================="
+
+          # Build AppImage
+          "$APPIMAGETOOL" "$APPIMAGE_DIR" "$BUILD_ARTIFACT_APPIMAGE"
 
       - parallel:
           - name: Upload build artifact
@@ -168,6 +217,14 @@ jobs:
             uses: actions/upload-artifact@v7
             with:
               path: ${{ env.BUILD_ARTIFACT_PORTABLE }}
+              if-no-files-found: error
+              archive: false
+
+          - name: Upload build artifact (AppImage)
+            if: env.BUILD_ARTIFACT_APPIMAGE != ''
+            uses: actions/upload-artifact@v7
+            with:
+              path: ${{ env.BUILD_ARTIFACT_APPIMAGE }}
               if-no-files-found: error
               archive: false
 
