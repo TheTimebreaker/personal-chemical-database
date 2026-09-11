@@ -104,7 +104,7 @@ jobs:
           if: runner.os == 'Linux'
           run: |
             uv run --no-managed-python pyinstaller --distpath dist/portable --workpath build/portable scripts/build.spec -- --portable
-            echo "REGULAR_EXE_PATH=./dist/portable/personal-chemical-database" >> "$GITHUB_ENV"
+            echo "PORTABLE_EXE_PATH=./dist/portable/personal-chemical-database" >> "$GITHUB_ENV"
             tar czf "${BUILD_ARTIFACT_PORTABLE}" -C dist/portable personal-chemical-database
 
         - name: Run PyInstaller (macOS)
