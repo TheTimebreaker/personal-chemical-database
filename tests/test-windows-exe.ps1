@@ -17,6 +17,8 @@ try {
         -FilePath $ExecutablePath `
         -ArgumentList "--ready-port", $port `
         -PassThru
+        -RedirectStandardOutput $stdout `
+        -RedirectStandardError $stderr
 
     Write-Host "Started file $ExecutablePath process $($process.Id)"
     Write-Host "Waiting for READY..."
