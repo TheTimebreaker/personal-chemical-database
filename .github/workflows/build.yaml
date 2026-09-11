@@ -61,10 +61,12 @@ jobs:
               artifact_portable=
           else
               artifact_portable=${common_path}_portable.tar.gz
+              artifact_appimage=${common_path}.AppImage"
           fi
           cat <<EOF >>"${GITHUB_ENV}"
           BUILD_ARTIFACT_DEFAULT=${artifact_default}
           ${artifact_portable:+BUILD_ARTIFACT_PORTABLE=${artifact_portable}}
+          ${artifact_appimage:+BUILD_ARTIFACT_APPIMAGE=${artifact_appimage}}
           EOF
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -189,10 +191,8 @@ jobs:
           # cp "path/to/your/icon.png" "$APPIMAGE_DIR/$APP_NAME.png"
 
           # Build AppImage
-          BUILD_ARTIFACT_APPIMAGE="./dist/appimage/${APP_NAME}-${VERSION}-x86_64.AppImage"
           appimagetool "$APPIMAGE_DIR" \
               "$BUILD_ARTIFACT_APPIMAGE"
-          echo "$BUILD_ARTIFACT_APPIMAGE" >> "$GITHUB_ENV"
 
       - parallel:
           - name: Upload build artifact
