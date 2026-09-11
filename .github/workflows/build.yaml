@@ -93,37 +93,56 @@ jobs:
 
 
       - parallel:
-          - name: Run PyInstaller (Linux)
-            if: runner.os == 'Linux'
-            run: |
-              uv run --no-managed-python pyinstaller --distpath dist/default --workpath build/default scripts/build.spec
-              tar czf "${BUILD_ARTIFACT_DEFAULT}" -C dist/default/personal-chemical-database .
+        - name: Run PyInstaller (Linux)
+          if: runner.os == 'Linux'
+          run: |
+            uv run --no-managed-python pyinstaller --distpath dist/default --workpath build/default scripts/build.spec
+            REGULAR_EXE_PATH="dist/default/personal-chemical-database/personal-chemical-database"
+            tar czf "${BUILD_ARTIFACT_DEFAULT}" -C dist/default/personal-chemical-database .
 
-          - name: Run PyInstaller (Linux portable)
-            if: runner.os == 'Linux'
-            run: |
-              uv run --no-managed-python pyinstaller --distpath dist/portable --workpath build/portable scripts/build.spec -- --portable
-              tar czf "${BUILD_ARTIFACT_PORTABLE}" -C dist/portable personal-chemical-database
+        - name: Run PyInstaller (Linux portable)
+          if: runner.os == 'Linux'
+          run: |
+            uv run --no-managed-python pyinstaller --distpath dist/portable --workpath build/portable scripts/build.spec -- --portable
+            PORTABLE_EXE_PATH="dist/portable/personal-chemical-database"
+            tar czf "${BUILD_ARTIFACT_PORTABLE}" -C dist/portable personal-chemical-database
 
-          - name: Run PyInstaller (macOS)
-            if: runner.os == 'macOS'
-            run: |
-              uv run --no-managed-python pyinstaller scripts/build.spec
-              tar czf "${BUILD_ARTIFACT_DEFAULT}" -C dist Personal-Chemical-Database.app
+        - name: Run PyInstaller (macOS)
+          if: runner.os == 'macOS'
+          run: |
+            uv run --no-managed-python pyinstaller scripts/build.spec
+            REGULAR_EXE_PATH="dist/Personal-Chemical-Database.app"
+            tar czf "${BUILD_ARTIFACT_DEFAULT}" -C dist Personal-Chemical-Database.app
 
-          - name: Run PyInstaller (Windows)
-            if: runner.os == 'Windows'
-            shell: pwsh
-            run: |
-              uv run --no-managed-python PyInstaller --distpath dist/default --workpath build/default scripts/build.spec
-              Compress-Archive -Path dist/default/personal-chemical-database -DestinationPath ${env:BUILD_ARTIFACT_DEFAULT}
+        - name: Run PyInstaller (Windows)
+          if: runner.os == 'Windows'
+          shell: pwsh
+          run: |
+            uv run --no-managed-python PyInstaller --distpath dist/default --workpath build/default scripts/build.spec
+            $REGULAR_EXE_PATH="dist/default/personal-chemical-database/personal-chemical-database.exe"
+            Compress-Archive -Path dist/default/personal-chemical-database -DestinationPath ${env:BUILD_ARTIFACT_DEFAULT}
 
-          - name: Run PyInstaller (Windows portable)
-            if: runner.os == 'Windows'
-            shell: pwsh
-            run: |
-              uv run --no-managed-python PyInstaller --distpath dist/portable --workpath build/portable scripts/build.spec -- --portable
-              Compress-Archive -Path dist/portable/personal-chemical-database.exe -DestinationPath ${env:BUILD_ARTIFACT_PORTABLE}
+        - name: Run PyInstaller (Windows portable)
+          if: runner.os == 'Windows'
+          shell: pwsh
+          run: |
+            uv run --no-managed-python PyInstaller --distpath dist/portable --workpath build/portable scripts/build.spec -- --portable
+            $PORTABLE_EXE_PATH="dist/portable/personal-chemical-database.exe"
+            Compress-Archive -Path dist/portable/personal-chemical-database.exe -DestinationPath ${env:BUILD_ARTIFACT_PORTABLE}
+
+
+      - parallel:
+        - name: Run PyInstaller (Windows)
+          if: runner.os == 'Windows'
+          shell: pwsh
+          run: |
+            .\tests\test-windows-exe.ps1 -ExecutablePath $REGULAR_EXE_PATH
+
+        - name: Run PyInstaller (Windows portable)
+          if: runner.os == 'Windows'
+          shell: pwsh
+          run: |
+            .\tests\test-windows-exe.ps1 -ExecutablePath $PORTABLE_EXE_PATH
 
 
       - parallel:
@@ -141,34 +160,6 @@ jobs:
               path: ${{ env.BUILD_ARTIFACT_PORTABLE }}
               if-no-files-found: error
               archive: false
-
-  test-executables:
-    needs: [build]
-    strategy:
-      matrix:
-        include:
-          - os: windows-2022
-            os-label: Windows x86
-            
-    name: Test on ${{ matrix.os-label && format(' ({0})', matrix.os-label) }}
-    runs-on: ${{ matrix.os }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-
-      - parallel:
-          - name: Test executable (Windows)
-            if: runner.os == 'Windows'
-            shell: pwsh
-            run: |
-              .\tests\test-windows-exe.ps1 -ExecutablePath "dist/default/personal-chemical-database/personal-chemical-database.exe"
-
-          - name: Test executable (Windows portable)
-            if: runner.os == 'Windows'
-            shell: pwsh
-            run: |
-              .\tests\test-windows-exe.ps1 -ExecutablePath "dist/portable/personal-chemical-database.exe"
-
 
   upload:
     permissions:
