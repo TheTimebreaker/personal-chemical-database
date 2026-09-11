@@ -8,67 +8,24 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-defaults:
-  run:
-    shell: sh
-
 jobs:
   build:
+    name: Build on ${{ matrix.os-label }}
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
-          - os: ubuntu-22.04
+          - id: linux-x86
+            os: ubuntu-22.04
             os-label: Linux x86
-
-          - os: macos-15
+          - id: macos-arm
+            os: macos-15
             os-label: macOS ARM
-
-          - os: windows-2022
+          - id: windows-x86
+            os: windows-2022
             os-label: Windows x86
 
-    name: Build on ${{ matrix.os-label && format(' ({0})', matrix.os-label) }}
-    runs-on: ${{ matrix.os }}
-    env:
-      BUILD_PREFIX: personal-chemical-database_${{ github.event.release.tag_name }}
-    outputs:
-      build-artifact-default: ${{ env.BUILD_ARTIFACT_DEFAULT }}
-      build-artifact-portable: ${{ env.BUILD_ARTIFACT_PORTABLE }}
     steps:
-      - name: Prepare build (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $dir = "${env:RUNNER_TEMP}/upload"
-          New-Item -Path ${dir} -ItemType Directory -Force
-          $os = ${env:RUNNER_OS}.ToLower()
-          $arch = uname -m
-          $commonPath = "${dir}/${env:BUILD_PREFIX}_${os}_${arch}"
-          Add-Content -Path ${env:GITHUB_ENV} -Value @"
-          BUILD_ARTIFACT_DEFAULT=${commonPath}.zip
-          BUILD_ARTIFACT_PORTABLE=${commonPath}_portable.zip
-          "@ -Encoding utf8
-      - name: Prepare build (non-Windows)
-        if: runner.os != 'Windows'
-        run: |
-          dir=${RUNNER_TEMP}/upload
-          mkdir -p "${dir}"
-          os=$(
-              tr '[:upper:]' '[:lower:]' <<EOF
-          ${RUNNER_OS}
-          EOF
-          )
-          arch=$(uname -m)
-          common_path=${dir}/${BUILD_PREFIX}_${os}_${arch}
-          artifact_default=${common_path}.tar.gz
-          if [ "${RUNNER_OS}" = macOS ]; then
-              artifact_portable=
-          else
-              artifact_portable=${common_path}_portable.tar.gz
-          fi
-          cat <<EOF >>"${GITHUB_ENV}"
-          BUILD_ARTIFACT_DEFAULT=${artifact_default}
-          ${artifact_portable:+BUILD_ARTIFACT_PORTABLE=${artifact_portable}}
-          EOF
       - name: Checkout repository
         uses: actions/checkout@v7
 
@@ -76,7 +33,6 @@ jobs:
         uses: ./.github/actions/setup-python
         with:
           groups: build
-
 
       - name: Verify build runtime
         run: |
@@ -90,110 +46,216 @@ jobs:
           print("Tk:", _tkinter.TK_VERSION)
 
           assert sys.version_info[:3] == (3, 14, 5), sys.version
-          assert _tkinter.TCL_VERSION in ("8.6", "9.0"), _tkinter.TCL_VERSION
-          assert _tkinter.TK_VERSION in ("8.6", "9.0"), _tkinter.TK_VERSION
+          assert _tkinter.TCL_VERSION in ("8.6", "9.0")
+          assert _tkinter.TK_VERSION in ("8.6", "9.0")
           PY
 
+      - name: Build executable (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          uv run --no-managed-python pyinstaller \
+            --distpath dist/default \
+            --workpath build/default \
+            scripts/build.spec
 
-      - parallel:
-          - name: Run PyInstaller (Linux)
-            if: runner.os == 'Linux'
-            run: |
-              uv run --no-managed-python pyinstaller --distpath dist/default --workpath build/default scripts/build.spec
-              tar czf "${BUILD_ARTIFACT_DEFAULT}" -C dist/default/personal-chemical-database .
+          uv run --no-managed-python pyinstaller \
+            --distpath dist/portable \
+            --workpath build/portable \
+            scripts/build.spec -- --portable
 
-          - name: Run PyInstaller (Linux portable)
-            if: runner.os == 'Linux'
-            run: |
-              uv run --no-managed-python pyinstaller --distpath dist/portable --workpath build/portable scripts/build.spec -- --portable
-              tar czf "${BUILD_ARTIFACT_PORTABLE}" -C dist/portable personal-chemical-database
+      - name: Build executable (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          uv run --no-managed-python pyinstaller scripts/build.spec
 
-          - name: Run PyInstaller (macOS)
-            if: runner.os == 'macOS'
-            run: |
-              uv run --no-managed-python pyinstaller scripts/build.spec
-              tar czf "${BUILD_ARTIFACT_DEFAULT}" -C dist Personal-Chemical-Database.app
+      - name: Build executable (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          uv run --no-managed-python PyInstaller `
+            --distpath dist/default `
+            --workpath build/default `
+            scripts/build.spec
 
-          - name: Run PyInstaller (Windows)
-            if: runner.os == 'Windows'
-            shell: pwsh
-            run: |
-              uv run --no-managed-python PyInstaller --distpath dist/default --workpath build/default scripts/build.spec
-              Compress-Archive -Path dist/default/personal-chemical-database -DestinationPath ${env:BUILD_ARTIFACT_DEFAULT}
+          uv run --no-managed-python PyInstaller `
+            --distpath dist/portable `
+            --workpath build/portable `
+            scripts/build.spec -- --portable
 
-          - name: Run PyInstaller (Windows portable)
-            if: runner.os == 'Windows'
-            shell: pwsh
-            run: |
-              uv run --no-managed-python PyInstaller --distpath dist/portable --workpath build/portable scripts/build.spec -- --portable
-              Compress-Archive -Path dist/portable/personal-chemical-database.exe -DestinationPath ${env:BUILD_ARTIFACT_PORTABLE}
+      - name: Upload default executable
+        uses: actions/upload-artifact@v7
+        with:
+          name: build-${{ matrix.id }}-default
+          path: |
+            dist/default
+            dist
+          if-no-files-found: error
+          archive: false
 
+      - name: Upload portable executable
+        if: runner.os != 'macOS'
+        uses: actions/upload-artifact@v7
+        with:
+          name: build-${{ matrix.id }}-portable
+          path: |
+            dist/portable
+          if-no-files-found: error
+          archive: false
 
-      - parallel:
-          - name: Upload build artifact
-            uses: actions/upload-artifact@v7
-            with:
-              path: ${{ env.BUILD_ARTIFACT_DEFAULT }}
-              if-no-files-found: error
-              archive: false
+  test:
+    name: Test Windows executables
+    needs: build
+    runs-on: windows-2022
 
-          - name: Upload build artifact (portable)
-            if: env.BUILD_ARTIFACT_PORTABLE != ''
-            uses: actions/upload-artifact@v7
-            with:
-              path: ${{ env.BUILD_ARTIFACT_PORTABLE }}
-              if-no-files-found: error
-              archive: false
+    steps:
+      - name: Download default executable
+        uses: actions/download-artifact@v8
+        with:
+          name: build-windows-x86-default
+          path: ${{ runner.temp }}/build/default
 
-  test-executables:
-    needs: [build]
+      - name: Download portable executable
+        uses: actions/download-artifact@v8
+        with:
+          name: build-windows-x86-portable
+          path: ${{ runner.temp }}/build/portable
+
+      - name: Test default executable
+        shell: pwsh
+        run: |
+          .\tests\test-windows-exe.ps1 `
+            -ExecutablePath "${env:RUNNER_TEMP}\build\default\personal-chemical-database\personal-chemical-database.exe"
+
+      - name: Test portable executable
+        shell: pwsh
+        run: |
+          .\tests\test-windows-exe.ps1 `
+            -ExecutablePath "${env:RUNNER_TEMP}\build\portable\personal-chemical-database.exe"
+
+  compress:
+    name: Compress ${{ matrix.os-label }} executables
+    needs: test
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
-          - os: windows-2022
+          - id: linux-x86
+            os: ubuntu-22.04
+            os-label: Linux x86
+          - id: macos-arm
+            os: macos-15
+            os-label: macOS ARM
+          - id: windows-x86
+            os: windows-2022
             os-label: Windows x86
-            
-    name: Test on ${{ matrix.os-label && format(' ({0})', matrix.os-label) }}
-    runs-on: ${{ matrix.os }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
 
-      - name: Download build artifacts
+    env:
+      BUILD_PREFIX: personal-chemical-database_${{ github.event.release.tag_name }}
+
+    steps:
+      - name: Download default executable
         uses: actions/download-artifact@v8
         with:
-          path: ${{ runner.temp }}/artifacts
-        
-      - parallel:
-          - name: Test executable (Windows)
-            if: runner.os == 'Windows'
-            shell: pwsh
-            run: |
-              .\tests\test-windows-exe.ps1 -ExecutablePath "${{ needs.build.outputs.build-artifact-default }}"
+          name: build-${{ matrix.id }}-default
+          path: ${{ runner.temp }}/build/default
 
-          - name: Test executable (Windows portable)
-            if: runner.os == 'Windows'
-            shell: pwsh
-            run: |
-              .\tests\test-windows-exe.ps1 -ExecutablePath "${{ needs.build.outputs.build-artifact-portable }}"
+      - name: Download portable executable
+        if: matrix.id != 'macos-arm'
+        uses: actions/download-artifact@v8
+        with:
+          name: build-${{ matrix.id }}-portable
+          path: ${{ runner.temp }}/build/portable
 
+      - name: Set archive paths (Linux/macOS)
+        id: paths-unix
+        if: runner.os != 'Windows'
+        run: |
+          os=$(printf '%s' "${RUNNER_OS}" | tr '[:upper:]' '[:lower:]')
+          arch=$(uname -m)
+          dir="${RUNNER_TEMP}/upload"
+          mkdir -p "${dir}"
+
+          common="${dir}/${BUILD_PREFIX}_${os}_${arch}"
+
+          echo "default=${common}.tar.gz" >> "${GITHUB_OUTPUT}"
+
+          if [ "${RUNNER_OS}" = "Linux" ]; then
+            echo "portable=${common}_portable.tar.gz" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Set archive paths (Windows)
+        id: paths-windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $dir = "${env:RUNNER_TEMP}/upload"
+          New-Item -Path $dir -ItemType Directory -Force | Out-Null
+
+          $arch = (uname -m)
+          $common = "${dir}/${env:BUILD_PREFIX}_windows_${arch}"
+
+          "default=${common}.zip" >> ${env:GITHUB_OUTPUT}
+          "portable=${common}_portable.zip" >> ${env:GITHUB_OUTPUT}
+
+      - name: Compress archives (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          tar czf "${{ steps.paths-unix.outputs.default }}" `
+            -C "${RUNNER_TEMP}/build/default/personal-chemical-database" .
+
+          tar czf "${{ steps.paths-unix.outputs.portable }}" `
+            -C "${RUNNER_TEMP}/build/portable" personal-chemical-database
+
+      - name: Compress archive (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          tar czf "${{ steps.paths-unix.outputs.default }}" `
+            -C "${RUNNER_TEMP}/build/default" Personal-Chemical-Database.app
+
+      - name: Compress archives (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Compress-Archive `
+            -Path "${env:RUNNER_TEMP}\build\default\personal-chemical-database" `
+            -DestinationPath "${{ steps.paths-windows.outputs.default }}"
+
+          Compress-Archive `
+            -Path "${env:RUNNER_TEMP}\build\portable\personal-chemical-database.exe" `
+            -DestinationPath "${{ steps.paths-windows.outputs.portable }}"
+
+      - name: Upload default archive
+        uses: actions/upload-artifact@v7
+        with:
+          name: archive-${{ matrix.id }}-default
+          path: ${{ runner.os == 'Windows' && steps.paths-windows.outputs.default || steps.paths-unix.outputs.default }}
+          if-no-files-found: error
+          archive: false
+
+      - name: Upload portable archive
+        if: matrix.id != 'macos-arm'
+        uses: actions/upload-artifact@v7
+        with:
+          name: archive-${{ matrix.id }}-portable
+          path: ${{ runner.os == 'Windows' && steps.paths-windows.outputs.portable || steps.paths-unix.outputs.portable }}
+          if-no-files-found: error
+          archive: false
 
   upload:
+    name: Upload archives to release
+    needs: compress
+    runs-on: ubuntu-latest
     permissions:
       contents: write
 
-    name: Upload Builds to Release
-    needs: [build, test-executables]
-    runs-on: ubuntu-latest
     steps:
-      - name: Download build artifacts
+      - name: Download compressed archives
         uses: actions/download-artifact@v8
         with:
           path: ${{ runner.temp }}/download
-          merge-multiple: 'true'
-          skip-decompress: 'true'
+          merge-multiple: true
 
-      - name: Upload build artifacts to release
+      - name: Upload archives to release
         uses: softprops/action-gh-release@v3
         with:
           files: ${{ runner.temp }}/download/*
