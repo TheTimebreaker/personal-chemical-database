@@ -3,8 +3,6 @@ param(
     [string]$ExecutablePath
 )
 
-Write-Host "$ExecutablePath"
-
 $timeoutSeconds = 30
 $listener = [System.Net.Sockets.TcpListener]::new(
     [System.Net.IPAddress]::Loopback,
@@ -20,7 +18,7 @@ try {
         -ArgumentList "--ready-port", $port `
         -PassThru
 
-    Write-Host "Started process $($process.Id)"
+    Write-Host "Started file $ExecutablePath in process $($process.Id)"
     Write-Host "Waiting for READY..."
 
     $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
