@@ -12,5 +12,3 @@ dist/
 *.bak
 *.log
 *.pyc
-
-test*.*

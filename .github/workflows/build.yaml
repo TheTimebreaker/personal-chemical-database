@@ -24,9 +24,9 @@ jobs:
             os-label: macOS ARM
 
           - os: windows-2022
-            os-label: Windows x86            
+            os-label: Windows x86
 
-    name: ${{ matrix.os-label && format(' ({0})', matrix.os-label) }}
+    name: Build on ${{ matrix.os-label && format(' ({0})', matrix.os-label) }}
     runs-on: ${{ matrix.os }}
     env:
       BUILD_PREFIX: personal-chemical-database_${{ github.event.release.tag_name }}
@@ -93,37 +93,66 @@ jobs:
 
 
       - parallel:
-          - name: Run PyInstaller (Linux)
-            if: runner.os == 'Linux'
-            run: |
-              uv run --no-managed-python pyinstaller --distpath dist/default --workpath build/default scripts/build.spec
-              tar czf "${BUILD_ARTIFACT_DEFAULT}" -C dist/default/personal-chemical-database .
+        - name: Run PyInstaller (Linux)
+          if: runner.os == 'Linux'
+          run: |
+            uv run --no-managed-python pyinstaller --distpath dist/default --workpath build/default scripts/build.spec
+            echo "REGULAR_EXE_PATH=./dist/default/personal-chemical-database/personal-chemical-database" >> "$GITHUB_ENV"
+            tar czf "${BUILD_ARTIFACT_DEFAULT}" -C dist/default/personal-chemical-database .
 
-          - name: Run PyInstaller (Linux portable)
-            if: runner.os == 'Linux'
-            run: |
-              uv run --no-managed-python pyinstaller --distpath dist/portable --workpath build/portable scripts/build.spec -- --portable
-              tar czf "${BUILD_ARTIFACT_PORTABLE}" -C dist/portable personal-chemical-database
+        - name: Run PyInstaller (Linux portable)
+          if: runner.os == 'Linux'
+          run: |
+            uv run --no-managed-python pyinstaller --distpath dist/portable --workpath build/portable scripts/build.spec -- --portable
+            echo "PORTABLE_EXE_PATH=./dist/portable/personal-chemical-database" >> "$GITHUB_ENV"
+            tar czf "${BUILD_ARTIFACT_PORTABLE}" -C dist/portable personal-chemical-database
 
-          - name: Run PyInstaller (macOS)
-            if: runner.os == 'macOS'
-            run: |
-              uv run --no-managed-python pyinstaller scripts/build.spec
-              tar czf "${BUILD_ARTIFACT_DEFAULT}" -C dist Personal-Chemical-Database.app
+        - name: Run PyInstaller (macOS)
+          if: runner.os == 'macOS'
+          run: |
+            uv run --no-managed-python pyinstaller scripts/build.spec
+            echo "REGULAR_EXE_PATH=./dist/Personal-Chemical-Database.app/Contents/MacOS/personal-chemical-database" >> "$GITHUB_ENV"
+            tar czf "${BUILD_ARTIFACT_DEFAULT}" -C dist Personal-Chemical-Database.app
 
-          - name: Run PyInstaller (Windows)
-            if: runner.os == 'Windows'
-            shell: pwsh
-            run: |
-              uv run --no-managed-python PyInstaller --distpath dist/default --workpath build/default scripts/build.spec
-              Compress-Archive -Path dist/default/personal-chemical-database -DestinationPath ${env:BUILD_ARTIFACT_DEFAULT}
+        - name: Run PyInstaller (Windows)
+          if: runner.os == 'Windows'
+          shell: pwsh
+          run: |
+            uv run --no-managed-python PyInstaller --distpath dist/default --workpath build/default scripts/build.spec
+            Add-Content -Path $env:GITHUB_ENV -Value "REGULAR_EXE_PATH=.\dist\default\personal-chemical-database\personal-chemical-database.exe"
+            Compress-Archive -Path dist/default/personal-chemical-database -DestinationPath ${env:BUILD_ARTIFACT_DEFAULT}
 
-          - name: Run PyInstaller (Windows portable)
-            if: runner.os == 'Windows'
-            shell: pwsh
-            run: |
-              uv run --no-managed-python PyInstaller --distpath dist/portable --workpath build/portable scripts/build.spec -- --portable
-              Compress-Archive -Path dist/portable/personal-chemical-database.exe -DestinationPath ${env:BUILD_ARTIFACT_PORTABLE}
+        - name: Run PyInstaller (Windows portable)
+          if: runner.os == 'Windows'
+          shell: pwsh
+          run: |
+            uv run --no-managed-python PyInstaller --distpath dist/portable --workpath build/portable scripts/build.spec -- --portable
+            Add-Content -Path $env:GITHUB_ENV -Value "PORTABLE_EXE_PATH=.\dist\portable\personal-chemical-database.exe"
+            Compress-Archive -Path dist/portable/personal-chemical-database.exe -DestinationPath ${env:BUILD_ARTIFACT_PORTABLE}
+
+
+      - parallel:
+        - name: Test executable (Windows)
+          if: runner.os == 'Windows'
+          shell: pwsh
+          run: |
+            python3 .\tests\test_executable.py $env:REGULAR_EXE_PATH
+
+        - name: Test executable (Windows portable)
+          if: runner.os == 'Windows'
+          shell: pwsh
+          run: |
+            python3 .\tests\test_executable.py $env:PORTABLE_EXE_PATH
+
+        - name: Test executable (non-Windows)
+          if: runner.os != 'Windows'
+          run: |
+            python3 ./tests/test_executable.py $REGULAR_EXE_PATH
+
+        - name: Test executable (non-Windows portable)
+          if: runner.os != 'Windows' && env.PORTABLE_EXE_PATH
+          run: |
+            python3 ./tests/test_executable.py $PORTABLE_EXE_PATH
 
 
       - parallel:
@@ -147,7 +176,7 @@ jobs:
       contents: write
 
     name: Upload Builds to Release
-    needs: [build]
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - name: Download build artifacts
