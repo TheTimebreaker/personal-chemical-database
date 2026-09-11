@@ -16,7 +16,7 @@ try {
     $process = Start-Process `
         -FilePath $ExecutablePath `
         -ArgumentList "--ready-port", $port `
-        -PassThru
+        -PassThru `
         -RedirectStandardOutput $stdout `
         -RedirectStandardError $stderr
 
