@@ -97,21 +97,21 @@ jobs:
           if: runner.os == 'Linux'
           run: |
             uv run --no-managed-python pyinstaller --distpath dist/default --workpath build/default scripts/build.spec
-            echo "REGULAR_EXE_PATH=dist/default/personal-chemical-database/personal-chemical-database" >> "$GITHUB_ENV"
+            echo "REGULAR_EXE_PATH=./dist/default/personal-chemical-database/personal-chemical-database" >> "$GITHUB_ENV"
             tar czf "${BUILD_ARTIFACT_DEFAULT}" -C dist/default/personal-chemical-database .
 
         - name: Run PyInstaller (Linux portable)
           if: runner.os == 'Linux'
           run: |
             uv run --no-managed-python pyinstaller --distpath dist/portable --workpath build/portable scripts/build.spec -- --portable
-            echo "REGULAR_EXE_PATH=dist/portable/personal-chemical-database" >> "$GITHUB_ENV"
+            echo "REGULAR_EXE_PATH=./dist/portable/personal-chemical-database" >> "$GITHUB_ENV"
             tar czf "${BUILD_ARTIFACT_PORTABLE}" -C dist/portable personal-chemical-database
 
         - name: Run PyInstaller (macOS)
           if: runner.os == 'macOS'
           run: |
             uv run --no-managed-python pyinstaller scripts/build.spec
-            echo "REGULAR_EXE_PATH=dist/Personal-Chemical-Database.app" >> "$GITHUB_ENV"
+            echo "REGULAR_EXE_PATH=./dist/Personal-Chemical-Database.app" >> "$GITHUB_ENV"
             tar czf "${BUILD_ARTIFACT_DEFAULT}" -C dist Personal-Chemical-Database.app
 
         - name: Run PyInstaller (Windows)
@@ -119,7 +119,7 @@ jobs:
           shell: pwsh
           run: |
             uv run --no-managed-python PyInstaller --distpath dist/default --workpath build/default scripts/build.spec
-            Add-Content -Path $env:GITHUB_ENV -Value "REGULAR_EXE_PATH=dist/default/personal-chemical-database/personal-chemical-database.exe"
+            Add-Content -Path $env:GITHUB_ENV -Value "REGULAR_EXE_PATH=.\dist\default\personal-chemical-database\personal-chemical-database.exe"
             Compress-Archive -Path dist/default/personal-chemical-database -DestinationPath ${env:BUILD_ARTIFACT_DEFAULT}
 
         - name: Run PyInstaller (Windows portable)
@@ -127,7 +127,7 @@ jobs:
           shell: pwsh
           run: |
             uv run --no-managed-python PyInstaller --distpath dist/portable --workpath build/portable scripts/build.spec -- --portable
-            Add-Content -Path $env:GITHUB_ENV -Value "PORTABLE_EXE_PATH=dist/portable/personal-chemical-database.exe"
+            Add-Content -Path $env:GITHUB_ENV -Value "PORTABLE_EXE_PATH=.\dist\portable\personal-chemical-database.exe"
             Compress-Archive -Path dist/portable/personal-chemical-database.exe -DestinationPath ${env:BUILD_ARTIFACT_PORTABLE}
 
 
