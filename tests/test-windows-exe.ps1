@@ -11,6 +11,8 @@ $listener = [System.Net.Sockets.TcpListener]::new(
 
 $listener.Start()
 $port = $listener.LocalEndpoint.Port
+$stdout = Join-Path $env:TEMP "exe-test-$PID-stdout.txt"
+$stderr = Join-Path $env:TEMP "exe-test-$PID-stderr.txt"
 
 try {
     $process = Start-Process `
