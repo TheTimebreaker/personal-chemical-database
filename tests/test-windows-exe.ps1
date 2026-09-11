@@ -24,7 +24,6 @@ try {
     $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 
     while ($true) {
-
         # 1. Did the application connect?
         if ($listener.Pending()) {
             $client = $listener.AcceptTcpClient()
@@ -55,6 +54,19 @@ try {
 
         # 2. Did the application die?
         if ($process.HasExited) {
+            Write-Host ""
+            Write-Host "========== APPLICATION STDOUT =========="
+            if (Test-Path $stdout) {
+                Get-Content $stdout
+            }
+
+            Write-Host ""
+            Write-Host "========== APPLICATION STDERR =========="
+            if (Test-Path $stderr) {
+                Get-Content $stderr
+            }
+
+            Write-Host ""
             throw "Application exited before becoming ready. Exit code: $($process.ExitCode)"
         }
 
