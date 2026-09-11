@@ -169,11 +169,12 @@ jobs:
           mkdir -p "$APPIMAGE_DIR/usr/bin/$APP_NAME"
           cp -a "$APP_DIR/." "$APPIMAGE_DIR/usr/bin/$APP_NAME/"
 
+          APPIMAGETOOL="${RUNNER_TEMP}/appimagetool-x86_64.AppImage"
           curl -fsSL \
-            -o "$RUNNER_TEMP/appimagetool-x86_64.AppImage" \
+            -o "$APPIMAGETOOL" \
             "https://github.com/AppImage/appimagetool/releases/latest/download/appimagetool-x86_64.AppImage"
-          chmod +x "$RUNNER_TEMP/appimagetool-x86_64.AppImage"
-          APPIMAGETOOL=${RUNNER_TEMP/appimagetool-x86_64.AppImage}
+          chmod +x "$APPIMAGETOOL"
+          
 
           # AppImage launcher
           cat > "$APPIMAGE_DIR/AppRun" <<EOF
