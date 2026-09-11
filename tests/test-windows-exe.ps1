@@ -8,7 +8,7 @@ $listener.Start()
 
 try {
     $process = Start-Process `
-        -FilePath "D:\Downloads\pcd.exe" `
+        -FilePath "D:\Downloads\personal-chemical-database_dev-e90914ba92d19eb31b2f88b4dd9945552caebcd6_windows_x86_64_portable\personal-chemical-database.exe" `
         -ArgumentList "--ready-port", $port `
         -PassThru
 
