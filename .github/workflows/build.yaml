@@ -111,8 +111,8 @@ jobs:
           if: runner.os == 'macOS'
           run: |
             uv run --no-managed-python pyinstaller scripts/build.spec
-            echo "REGULAR_EXE_PATH=./dist/Personal-Chemical-Database.app" >> "$GITHUB_ENV"
-            tar czf "${BUILD_ARTIFACT_DEFAULT}" -C dist Personal-Chemical-Database.app
+            echo "REGULAR_EXE_PATH=./dist/personal-chemical-database.app" >> "$GITHUB_ENV"
+            tar czf "${BUILD_ARTIFACT_DEFAULT}" -C dist personal-chemical-database.app
 
         - name: Run PyInstaller (Windows)
           if: runner.os == 'Windows'
