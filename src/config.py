@@ -10,7 +10,7 @@ if __name__ == "__main__":
 pl_dirs = platformdirs.PlatformDirs("personal-chemical-database", "TheTimebreaker")
 
 try:
-    (pl_dirs.user_config_path).mkdir(exist_ok=True)
+    (pl_dirs.user_config_path).mkdir(exist_ok=True, parents=True)
     config_path = pl_dirs.user_config_path / "config.json"
     logging.info("Using %s as config directory", config_path)
     with open(config_path, encoding="utf-8") as file:
