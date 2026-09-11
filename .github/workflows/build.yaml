@@ -169,6 +169,12 @@ jobs:
           mkdir -p "$APPIMAGE_DIR/usr/bin/$APP_NAME"
           cp -a "$APP_DIR/." "$APPIMAGE_DIR/usr/bin/$APP_NAME/"
 
+          curl -fsSL \
+            -o "$RUNNER_TEMP/appimagetool-x86_64.AppImage" \
+            "https://github.com/AppImage/appimagetool/releases/latest/download/appimagetool-x86_64.AppImage"
+          chmod +x "$RUNNER_TEMP/appimagetool-x86_64.AppImage"
+          APPIMAGETOOL=${RUNNER_TEMP/appimagetool-x86_64.AppImage}
+
           # AppImage launcher
           cat > "$APPIMAGE_DIR/AppRun" <<EOF
           #!/bin/sh
@@ -191,8 +197,7 @@ jobs:
           # cp "path/to/your/icon.png" "$APPIMAGE_DIR/$APP_NAME.png"
 
           # Build AppImage
-          appimagetool "$APPIMAGE_DIR" \
-              "$BUILD_ARTIFACT_APPIMAGE"
+          "$APPIMAGETOOL" "$APPIMAGE_DIR" "$BUILD_ARTIFACT_APPIMAGE"
 
       - parallel:
           - name: Upload build artifact
