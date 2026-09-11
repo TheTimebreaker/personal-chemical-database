@@ -111,8 +111,8 @@ jobs:
           if: runner.os == 'macOS'
           run: |
             uv run --no-managed-python pyinstaller scripts/build.spec
-            echo "REGULAR_EXE_PATH=./dist/personal-chemical-database.app" >> "$GITHUB_ENV"
-            tar czf "${BUILD_ARTIFACT_DEFAULT}" -C dist personal-chemical-database.app
+            echo "REGULAR_EXE_PATH=./dist/Personal-Chemical-Database.app/Contents/MacOS/personal-chemical-database" >> "$GITHUB_ENV"
+            tar czf "${BUILD_ARTIFACT_DEFAULT}" -C dist Personal-Chemical-Database.app
 
         - name: Run PyInstaller (Windows)
           if: runner.os == 'Windows'
@@ -148,7 +148,7 @@ jobs:
           if: runner.os != 'Windows'
           run: |
             find . | grep -Ev '\.git|\.venv'
-            echo $REGULAR_EXE_PATH
+            echo "REGULAR_EXE_PATH=${REGULAR_EXE_PATH}"
             python3 ./tests/test_executable.py $REGULAR_EXE_PATH
 
         - name: Test executable (non-Windows portable)
