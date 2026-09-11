@@ -147,13 +147,13 @@ jobs:
         - name: Test executable (non-Windows)
           if: runner.os != 'Windows'
           run: |
-            tree
+            find .
             python3 ./tests/test_executable.py $env:REGULAR_EXE_PATH
 
         - name: Test executable (non-Windows portable)
           if: runner.os != 'Windows'
           run: |
-            tree
+            find .
             python3 ./tests/test_executable.py $env:PORTABLE_EXE_PATH
 
 
