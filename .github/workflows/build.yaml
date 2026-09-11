@@ -158,7 +158,7 @@ jobs:
       - name: Compile Linux AppImage
         if: runner.os == 'Linux'
         run: |
-          set -euo pipefail
+          set -eu
 
           APP_NAME="personal-chemical-database"
           APP_DIR="$REGULAR_EXE_DIR"
