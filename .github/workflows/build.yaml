@@ -131,7 +131,18 @@ jobs:
             Compress-Archive -Path dist/portable/personal-chemical-database.exe -DestinationPath ${env:BUILD_ARTIFACT_PORTABLE}
 
 
+      - parallel:
+        - name: Test executable (Windows)
+          if: runner.os == 'Windows'
+          shell: pwsh
+          run: |
+            .\tests\test-windows-exe.ps1 -ExecutablePath $env:REGULAR_EXE_PATH
 
+        - name: Test executable (Windows portable)
+          if: runner.os == 'Windows'
+          shell: pwsh
+          run: |
+            .\tests\test-windows-exe.ps1 -ExecutablePath $env:PORTABLE_EXE_PATH
 
 
       - parallel:
