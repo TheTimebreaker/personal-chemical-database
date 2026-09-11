@@ -24,7 +24,7 @@ jobs:
             os-label: macOS ARM
 
           - os: windows-2022
-            os-label: Windows x86            
+            os-label: Windows x86
 
     name: ${{ matrix.os-label && format(' ({0})', matrix.os-label) }}
     runs-on: ${{ matrix.os }}
@@ -141,6 +141,26 @@ jobs:
               path: ${{ env.BUILD_ARTIFACT_PORTABLE }}
               if-no-files-found: error
               archive: false
+
+  test-executables:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            os-label: Linux x86
+
+          - os: macos-15
+            os-label: macOS ARM
+
+          - os: windows-2022
+            os-label: Windows x86
+            
+    name: ${{ matrix.os-label && format(' ({0})', matrix.os-label) }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
 
   upload:
     permissions:
