@@ -61,7 +61,7 @@ jobs:
               artifact_portable=
           else
               artifact_portable=${common_path}_portable.tar.gz
-              artifact_appimage=${common_path}.AppImage"
+              artifact_appimage=${common_path}.AppImage
           fi
           cat <<EOF >>"${GITHUB_ENV}"
           BUILD_ARTIFACT_DEFAULT=${artifact_default}
