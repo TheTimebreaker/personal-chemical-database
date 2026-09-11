@@ -168,6 +168,7 @@ jobs:
 
           mkdir -p "$APPIMAGE_DIR/usr/bin/$APP_NAME"
           cp -a "$APP_DIR/." "$APPIMAGE_DIR/usr/bin/$APP_NAME/"
+          cp ./img/icon-linux.png "APPIMAGE_DIR/$APP_NAME.png"
 
           APPIMAGETOOL="${RUNNER_TEMP}/appimagetool-x86_64.AppImage"
           curl -fsSL \
@@ -193,16 +194,12 @@ jobs:
           Exec=$APP_NAME
           Type=Application
           Categories=Utility;
-          Icon=./img/icon-linux
+          Icon=$APP_NAME
           EOF
 
           echo "=== Desktop file ==="
           cat "$APPIMAGE_DIR/personal-chemical-database.desktop"
           echo "===================="
-
-
-          # Icon (assuming you have one)
-          # cp "path/to/your/icon.png" "$APPIMAGE_DIR/$APP_NAME.png"
 
           # Build AppImage
           "$APPIMAGETOOL" "$APPIMAGE_DIR" "$BUILD_ARTIFACT_APPIMAGE"
