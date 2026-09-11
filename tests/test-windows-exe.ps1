@@ -3,15 +3,14 @@ param(
     [string]$ExecutablePath
 )
 
-$port = 12345
 $timeoutSeconds = 30
 $listener = [System.Net.Sockets.TcpListener]::new(
     [System.Net.IPAddress]::Loopback,
-    $port
+    0
 )
 
 $listener.Start()
-
+$port = $listener.LocalEndpoint.Port
 
 try {
     $process = Start-Process `
