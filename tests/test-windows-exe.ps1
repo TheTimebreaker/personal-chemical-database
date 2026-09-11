@@ -3,6 +3,8 @@ param(
     [string]$ExecutablePath
 )
 
+Write-Host "$ExecutablePath"
+
 $timeoutSeconds = 30
 $listener = [System.Net.Sockets.TcpListener]::new(
     [System.Net.IPAddress]::Loopback,
