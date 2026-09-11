@@ -136,13 +136,13 @@ jobs:
           if: runner.os == 'Windows'
           shell: pwsh
           run: |
-            .\tests\test-windows-exe.ps1 -ExecutablePath $env:REGULAR_EXE_PATH
+            python .\tests\test_executable.py $env:REGULAR_EXE_PATH
 
         - name: Test executable (Windows portable)
           if: runner.os == 'Windows'
           shell: pwsh
           run: |
-            .\tests\test-windows-exe.ps1 -ExecutablePath $env:PORTABLE_EXE_PATH
+            python .\tests\test_executable.py $env:PORTABLE_EXE_PATH
 
 
       - parallel:
