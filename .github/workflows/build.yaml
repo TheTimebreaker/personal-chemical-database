@@ -161,13 +161,13 @@ jobs:
             if: runner.os == 'Windows'
             shell: pwsh
             run: |
-              ./test/test-windows-exe.ps1 -ExecutablePath ${env:BUILD_ARTIFACT_DEFAULT}
+              .\test\test-windows-exe.ps1 -ExecutablePath ${env:BUILD_ARTIFACT_DEFAULT}
 
           - name: Test executable (Windows portable)
             if: runner.os == 'Windows'
             shell: pwsh
             run: |
-              ./test/test-windows-exe.ps1 -ExecutablePath ${env:BUILD_ARTIFACT_PORTABLE}
+              .\test\test-windows-exe.ps1 -ExecutablePath ${env:BUILD_ARTIFACT_PORTABLE}
 
 
   upload:
