@@ -147,15 +147,11 @@ jobs:
         - name: Test executable (non-Windows)
           if: runner.os != 'Windows'
           run: |
-            find . | grep -Ev '\.git|\.venv'
-            echo "REGULAR_EXE_PATH=${REGULAR_EXE_PATH}"
             python3 ./tests/test_executable.py $REGULAR_EXE_PATH
 
         - name: Test executable (non-Windows portable)
-          if: ${{ runner.os != 'Windows' && env.PORTABLE_EXE_PATH }}
+          if: runner.os != 'Windows' && env.PORTABLE_EXE_PATH
           run: |
-            find . | grep -Ev '\.git|\.venv'
-            echo "PORTABLE_EXE_PATH=${PORTABLE_EXE_PATH}"
             python3 ./tests/test_executable.py $PORTABLE_EXE_PATH
 
 
