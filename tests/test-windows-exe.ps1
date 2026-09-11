@@ -1,4 +1,10 @@
+param(
+    [Parameter(Mandatory = $true)]
+    [string]$ExecutablePath
+)
+
 $port = 12345
+$timeoutSeconds = 30
 $listener = [System.Net.Sockets.TcpListener]::new(
     [System.Net.IPAddress]::Loopback,
     $port
@@ -6,41 +12,70 @@ $listener = [System.Net.Sockets.TcpListener]::new(
 
 $listener.Start()
 
+
 try {
     $process = Start-Process `
-        -FilePath "D:\Downloads\personal-chemical-database_dev-e90914ba92d19eb31b2f88b4dd9945552caebcd6_windows_x86_64_portable\personal-chemical-database.exe" `
+        -FilePath $ExecutablePath `
         -ArgumentList "--ready-port", $port `
         -PassThru
 
     Write-Host "Started process $($process.Id)"
     Write-Host "Waiting for READY..."
 
-    # Wait for the application to connect
-    $client = $listener.AcceptTcpClient()
+    $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 
-    try {
-        $stream = $client.GetStream()
+    while ($true) {
 
-        $buffer = New-Object byte[] 1024
-        $bytesRead = $stream.Read($buffer, 0, $buffer.Length)
+        # 1. Did the application connect?
+        if ($listener.Pending()) {
+            $client = $listener.AcceptTcpClient()
 
-        $message = [System.Text.Encoding]::UTF8.GetString(
-            $buffer,
-            0,
-            $bytesRead
-        )
+            try {
+                $stream = $client.GetStream()
 
-        if ($message -eq "READY") {
-            Write-Host "Application initialized successfully"
+                $buffer = New-Object byte[] 1024
+                $bytesRead = $stream.Read($buffer, 0, $buffer.Length)
+
+                $message = [System.Text.Encoding]::UTF8.GetString(
+                    $buffer,
+                    0,
+                    $bytesRead
+                )
+
+                if ($message -eq "READY") {
+                    Write-Host "Application initialized successfully"
+                    exit 0
+                }
+
+                throw "Unexpected readiness message: '$message'"
+            }
+            finally {
+                $client.Close()
+            }
         }
-        else {
-            throw "Unexpected readiness message: $message"
+
+        # 2. Did the application die?
+        if ($process.HasExited) {
+            throw "Application exited before becoming ready. Exit code: $($process.ExitCode)"
         }
-    }
-    finally {
-        $client.Close()
+
+        # 3. Did we exceed the timeout?
+        if ($stopwatch.Elapsed.TotalSeconds -ge $timeoutSeconds) {
+            throw "Application did not become ready within $timeoutSeconds seconds"
+        }
+
+        # Don't busy-loop
+        Start-Sleep -Milliseconds 100
     }
 }
 finally {
     $listener.Stop()
+
+    # Make sure the application doesn't remain running after the test
+    if ($process -and -not $process.HasExited) {
+        Write-Host "Stopping application..."
+        taskkill /PID $process.Id /T /F
+        $process.WaitForExit()
+        Write-Host "Stopped application (and all its children processes) :)"
+    }
 }
