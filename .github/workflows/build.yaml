@@ -153,21 +153,18 @@ jobs:
     name: ${{ matrix.os-label && format(' ({0})', matrix.os-label) }}
     runs-on: ${{ matrix.os }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-
       - parallel:
           - name: Test executable (Windows)
             if: runner.os == 'Windows'
             shell: pwsh
             run: |
-              .\test\test-windows-exe.ps1 -ExecutablePath ${env:BUILD_ARTIFACT_DEFAULT}
+              .\tests\test-windows-exe.ps1 -ExecutablePath ${env:BUILD_ARTIFACT_DEFAULT}
 
           - name: Test executable (Windows portable)
             if: runner.os == 'Windows'
             shell: pwsh
             run: |
-              .\test\test-windows-exe.ps1 -ExecutablePath ${env:BUILD_ARTIFACT_PORTABLE}
+              .\tests\test-windows-exe.ps1 -ExecutablePath ${env:BUILD_ARTIFACT_PORTABLE}
 
 
   upload:
