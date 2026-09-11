@@ -127,7 +127,7 @@ jobs:
           shell: pwsh
           run: |
             uv run --no-managed-python PyInstaller --distpath dist/portable --workpath build/portable scripts/build.spec -- --portable
-            Add-Content -Path $env:GITHUB_ENV -Value "REGULAR_EXE_PATH=dist/default/personal-chemical-database/dist/portable/personal-chemical-database.exe"
+            Add-Content -Path $env:GITHUB_ENV -Value "PORTABLE_EXE_PATH=dist/portable/personal-chemical-database.exe"
             Compress-Archive -Path dist/portable/personal-chemical-database.exe -DestinationPath ${env:BUILD_ARTIFACT_PORTABLE}
 
 
