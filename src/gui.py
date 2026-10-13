@@ -252,7 +252,8 @@ class AddMolecule(QWidget):
             else:
                 text = f"#{index}-{data['data_type']}"
             label = QPushButton(text)
-            label.setStyleSheet(self._status_style(data_uuid in self._deleted_data, data_uuid in self._new_data, data_uuid in self._updated_data))
+            status_style = self._status_style(data_uuid in self._deleted_data, data_uuid in self._new_data, data_uuid in self._updated_data)
+            label.setStyleSheet(f"{status_style} text-align: left;")
             label.setFlat(True)
             label.setEnabled(True)
             label.clicked.connect(lambda _checked=False, key=data_uuid: self.open_data_dialog(data_uuid=key))
