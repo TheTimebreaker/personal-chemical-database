@@ -8,6 +8,7 @@ import pubchempy
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QMouseEvent, QPixmap
 from PySide6.QtWidgets import (
+    QApplication,
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -228,8 +229,12 @@ class AddMolecule(QWidget):
         self._clear_layout(self.names_layout)
         for name in self.compound_names:
             row = QHBoxLayout()
-            label = QLabel(name)
-            label.setStyleSheet(self._status_style(name in self._deleted_compound_names, name in self._new_compound_names))
+            label = QPushButton(name)
+            status_style = self._status_style(name in self._deleted_compound_names, name in self._new_compound_names)
+            label.setStyleSheet(f"{status_style} text-align: left;")
+            label.setFlat(True)
+            label.setToolTip("Click to copy")
+            label.clicked.connect(lambda _checked=False, value=name: QApplication.clipboard().setText(value))
             row.addWidget(label, 1)
             if not self.viewer_mode:
                 if name in self._deleted_compound_names:
