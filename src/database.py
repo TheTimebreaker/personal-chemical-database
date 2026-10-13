@@ -1,6 +1,7 @@
 import json
 import logging
 import uuid as uuid_module
+from collections.abc import Callable
 from typing import Literal, TypedDict
 
 import pubchempy
@@ -27,7 +28,7 @@ class MoleculeData(TypedDict):
 class NMRData(MoleculeData):
     data_type: Literal["1H NMR", "13C NMR", "19F NMR", "31P NMR"]  # type: ignore
     solvent: str
-    frequency: float
+    frequency: float | str
     data: str  # type: ignore
     source: str  # type: ignore
 
@@ -260,6 +261,7 @@ def generate_molecule_data(
     inchikey: str | None = None,
     cas: str | None = None,
     compound_name: str | None = None,
+    choose_compound: Callable[[list[pubchempy.Compound]], pubchempy.Compound | None] | None = None,
 ) -> Molecule:
     if smiles:
         molecule_rdkitmol = Chem.MolFromSmiles(smiles, sanitize=True)
@@ -269,10 +271,10 @@ def generate_molecule_data(
         molecule_rdkitmol = Chem.MolFromInchi(inchi, sanitize=True)
     elif cas or compound_name:
         compounds = pubchempy.get_compounds(cas or compound_name, "name")
-        molecule_rdkitmol = Chem.MolFromInchi(pubchemsearchselection(compounds).inchi, sanitize=True)
+        molecule_rdkitmol = Chem.MolFromInchi(pubchemsearchselection(compounds, choose_compound).inchi, sanitize=True)
     elif inchikey:
         compounds = pubchempy.get_compounds(inchikey, "inchikey")
-        molecule_rdkitmol = Chem.MolFromInchi(pubchemsearchselection(compounds).inchi, sanitize=True)
+        molecule_rdkitmol = Chem.MolFromInchi(pubchemsearchselection(compounds, choose_compound).inchi, sanitize=True)
     else:
         raise ValueError("The arguments given are not enough to create an RDKit molecule.")
 
@@ -289,8 +291,16 @@ def generate_molecule_data(
     return Molecule(inchi=inchi_str, inchikey=inchikey, smiles=canonical_smiles, cas=cas, names=names)
 
 
-def pubchemsearchselection(compounds: list[pubchempy.Compound]) -> pubchempy.Compound:
+def pubchemsearchselection(
+    compounds: list[pubchempy.Compound],
+    choose_compound: Callable[[list[pubchempy.Compound]], pubchempy.Compound | None] | None = None,
+) -> pubchempy.Compound:
     if compounds and len(compounds) > 1:
+        if choose_compound is not None:
+            choice = choose_compound(compounds)
+            if choice is None:
+                raise ValueError("No valid choice made.")
+            return choice
         print("=" * 20)
         for i, c in enumerate(compounds):
             print(f"[{i}] - {c}")

@@ -81,16 +81,15 @@ jobs:
         run: |
           uv run --no-managed-python python - <<'PY'
           import sys
-          import _tkinter
+          from PySide6.QtWidgets import QApplication, QMainWindow
 
           print("Python:", sys.version)
           print("Python executable:", sys.executable)
-          print("Tcl:", _tkinter.TCL_VERSION)
-          print("Tk:", _tkinter.TK_VERSION)
+          print("PySide6:", __import__("PySide6").__version__)
 
           assert sys.version_info[:3] == (3, 14, 5), sys.version
-          assert _tkinter.TCL_VERSION in ("8.6", "9.0"), _tkinter.TCL_VERSION
-          assert _tkinter.TK_VERSION in ("8.6", "9.0"), _tkinter.TK_VERSION
+          assert QApplication is not None
+          assert QMainWindow is not None
           PY
 
 

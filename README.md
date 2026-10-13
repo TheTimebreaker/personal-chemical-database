@@ -21,6 +21,7 @@ Well, this little project aims to help you.
 * Add a source for a piece of data, so you can find the source later (e.g. to cite it).
 * Search allows for quickly finding what you're looking for.
 * Simple, self-explaining UI.
+* Cross-platform desktop interface built with Qt for Python (PySide6).
 
 
 <h2>Attributions</h2>

@@ -1,10 +1,12 @@
 import argparse
 import logging
 import socket
-import tkinter as tk
+import sys
+
+from PySide6.QtWidgets import QApplication
 
 from gui import GUI
-from style import configure_ttk_style, style_root
+from style import configure_app_style
 
 
 def signal_ready(port: int) -> None:
@@ -13,12 +15,16 @@ def signal_ready(port: int) -> None:
         sock.sendall(b"READY")
 
 
-def main() -> None:
-    root = tk.Tk()
-    style_root(root)
-    configure_ttk_style()
-    GUI(root)
-    tk.mainloop()
+def main(ready_port: int | None = None) -> int:
+    app = QApplication([sys.argv[0]])
+    app.setApplicationName("Personal Chemical Database")
+    configure_app_style(app)
+    window = GUI()
+    window.show()
+    app.processEvents()
+    if ready_port is not None:
+        signal_ready(ready_port)
+    return app.exec()
 
 
 if __name__ == "__main__":
@@ -27,7 +33,4 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--ready-port", type=int)
     args = parser.parse_args()
-    if args.ready_port is not None:
-        signal_ready(args.ready_port)
-
-    main()
+    sys.exit(main(args.ready_port))

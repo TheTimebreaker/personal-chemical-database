@@ -1,8 +1,8 @@
 import argparse
 import platform
 import subprocess
-from tomllib import load
 from pathlib import Path
+from tomllib import load
 
 from PyInstaller.building.api import COLLECT, EXE, PYZ
 from PyInstaller.building.build_main import Analysis
@@ -34,7 +34,7 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[],
-    hiddenimports=["PIL._tkinter_finder", "PIL._imagingtk"],
+    hiddenimports=[],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
