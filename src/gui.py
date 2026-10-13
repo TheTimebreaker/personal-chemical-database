@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from io import BytesIO
 from typing import Literal, cast, override
 
@@ -64,28 +65,61 @@ class MoleculeDataDialog(QDialog):
         self.setMinimumWidth(640)
         form = QFormLayout()
         self.form = form
-        self.type_box = QComboBox()
-        self.type_box.addItem("")
-        self.type_box.addItems(DATA_TYPES)
-        self.solvent_edit = QLineEdit()
-        self.frequency_edit = QLineEdit()
-        self.data_edit = QTextEdit()
-        self.source_edit = QLineEdit()
+        type_value = str(data.get("data_type", "")) if data else ""
+        solvent_value = str(data.get("solvent", "")) if data else ""
+        frequency_value = str(data.get("frequency", "")) if data else ""
+        data_value = str(data.get("data", "")) if data else ""
+        source_value = str(data.get("source", "")) if data else ""
+        fields: Mapping[str, QWidget]
 
-        if data:
-            self.type_box.setCurrentText(str(data.get("data_type", "")))
-            self.solvent_edit.setText(str(data.get("solvent", "")))
-            self.frequency_edit.setText(str(data.get("frequency", "")))
-            self.data_edit.setPlainText(str(data.get("data", "")))
-            self.source_edit.setText(str(data.get("source", "")))
+        if read_only:
+            self.type_box = None
+            self.solvent_edit = None
+            self.frequency_edit = None
+            self.data_edit = None
+            self.source_edit = None
+            field_values = {
+                "Type": type_value,
+                "Solvent": solvent_value,
+                "Frequency": frequency_value,
+                "Data": data_value,
+                "Source": source_value,
+            }
+            display_fields: dict[str, QLabel] = {}
+            for field_name, value in field_values.items():
+                label = QLabel(value)
+                label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+                label.setWordWrap(field_name == "Data")
+                display_fields[field_name] = label
+            self.display_fields = display_fields
+            fields = display_fields
+        else:
+            self.type_box = QComboBox()
+            self.type_box.addItem("")
+            self.type_box.addItems(DATA_TYPES)
+            self.type_box.setCurrentText(type_value)
+            self.solvent_edit = QLineEdit(solvent_value)
+            self.frequency_edit = QLineEdit(frequency_value)
+            self.data_edit = QTextEdit()
+            self.data_edit.setPlainText(data_value)
+            self.source_edit = QLineEdit(source_value)
+            fields = {
+                "Type": self.type_box,
+                "Solvent": self.solvent_edit,
+                "Frequency": self.frequency_edit,
+                "Data": self.data_edit,
+                "Source": self.source_edit,
+            }
 
-        form.addRow("Type:", self.type_box)
-        self.solvent_row = form.rowCount()
-        form.addRow("Solvent:", self.solvent_edit)
-        self.frequency_row = form.rowCount()
-        form.addRow("Frequency:", self.frequency_edit)
-        form.addRow("Data:", self.data_edit)
-        form.addRow("Source:", self.source_edit)
+        for field_name, field_widget in fields.items():
+            row = form.rowCount()
+            form.addRow(f"{field_name}:", field_widget)
+            if field_name == "Solvent":
+                self.solvent_row = row
+            elif field_name == "Frequency":
+                self.frequency_row = row
+            if read_only and field_name in ("Solvent", "Frequency"):
+                form.setRowVisible(row, "NMR" in type_value)
         layout = QVBoxLayout(self)
         layout.addLayout(form)
         self.buttons = QDialogButtonBox()
@@ -97,13 +131,9 @@ class MoleculeDataDialog(QDialog):
         layout.addWidget(self.buttons)
         self.buttons.accepted.connect(self._validate_and_accept)
         self.buttons.rejected.connect(self.reject)
-        self.type_box.currentTextChanged.connect(self._update_nmr_fields)
-        self._update_nmr_fields(self.type_box.currentText())
-
-        for widget in (self.type_box, self.solvent_edit, self.frequency_edit, self.data_edit, self.source_edit):
-            widget.setEnabled(not read_only)
-        if read_only:
-            self.data_edit.setReadOnly(True)
+        if self.type_box is not None:
+            self.type_box.currentTextChanged.connect(self._update_nmr_fields)
+            self._update_nmr_fields(self.type_box.currentText())
 
     def _update_nmr_fields(self, data_type: str) -> None:
         is_nmr = "NMR" in data_type
@@ -120,6 +150,8 @@ class MoleculeDataDialog(QDialog):
             self.accept()
 
     def values(self) -> dict[str, str]:
+        if self.type_box is None or self.solvent_edit is None or self.frequency_edit is None or self.data_edit is None or self.source_edit is None:
+            raise RuntimeError("Read-only data details do not have editable values.")
         return {
             "Type": self.type_box.currentText().strip(),
             "Solvent": self.solvent_edit.text().strip(),
