@@ -22,7 +22,7 @@ if system == "Windows":
     ICON = (Path(".") / "img" / "icon-Win.ico").resolve()
 elif system == "Darwin":
     ICON = (Path(".") / "img" / "icon-Mac.icns").resolve()
-else: #Linux doesn't use built-into-EXE icons
+else:  # Linux doesn't use built-into-EXE icons
     ICON = None
 VERSION = subprocess.check_output(["git", "describe", "--tags", "--abbrev=0"]).decode().strip()
 
