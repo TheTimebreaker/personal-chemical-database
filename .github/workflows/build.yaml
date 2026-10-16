@@ -95,12 +95,12 @@ jobs:
             libx11-6 \
             libx11-xcb1 \
             libxcb1 \
+            libxcb-cursor0 \
             libxext6 \
             libxrender1 \
             libxi6 \
             libxfixes3 \
             libxkbcommon-x11-0 \
-            xcb
 
       - parallel:
         - name: Run PyInstaller (Linux)
@@ -159,12 +159,12 @@ jobs:
         - name: Test executable (non-Windows)
           if: runner.os != 'Windows'
           run: |
-            python3 ./tests/test_executable.py $REGULAR_EXE_PATH
+            QT_QPA_PLATFORM=offscreen python3 ./tests/test_executable.py $REGULAR_EXE_PATH
 
         - name: Test executable (non-Windows portable)
           if: runner.os != 'Windows' && env.PORTABLE_EXE_PATH
           run: |
-            python3 ./tests/test_executable.py $PORTABLE_EXE_PATH
+            QT_QPA_PLATFORM=offscreen python3 ./tests/test_executable.py $PORTABLE_EXE_PATH
 
       - name: Compile Linux AppImage
         if: runner.os == 'Linux'
