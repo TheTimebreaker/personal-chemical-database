@@ -1,8 +1,9 @@
 name: Build
 
 on:
-  release:
-    types: created
+  push:
+    tags:
+      - "v*"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -26,7 +27,7 @@ jobs:
     name: Build on ${{ matrix.os-label && format(' ({0})', matrix.os-label) }}
     runs-on: ${{ matrix.os }}
     env:
-      BUILD_PREFIX: personal-chemical-database_${{ github.event.release.tag_name }}
+      BUILD_PREFIX: personal-chemical-database_${{ github.ref_name }}
     steps:
       - name: Prepare build (Windows)
         if: runner.os == 'Windows'
@@ -56,7 +57,7 @@ jobs:
           artifact_default=${common_path}.tar.gz
           artifact_portable=${common_path}_portable.tar.gz
           artifact_appimage=${common_path}.AppImage
-          
+
           cat <<EOF >>"${GITHUB_ENV}"
           BUILD_ARTIFACT_DEFAULT=${artifact_default}
           ${artifact_portable:+BUILD_ARTIFACT_PORTABLE=${artifact_portable}}
