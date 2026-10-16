@@ -76,6 +76,19 @@ jobs:
         with:
           groups: build
 
+      - name: Install system libraries (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -eu
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libegl1-mesa \
+            libgl1-mesa-glx \
+            libx11-6 \
+            libxrandr2 \
+            libxrender1 \
+            libxext6
+
       - parallel:
         - name: Run PyInstaller (Linux)
           if: runner.os == 'Linux'
@@ -182,6 +195,10 @@ jobs:
           echo "=== Desktop file ==="
           cat "$APPIMAGE_DIR/personal-chemical-database.desktop"
           echo "===================="
+
+          # Copy some Qt runtime dependencies
+          mkdir -p "$APPIMAGE_DIR/usr/lib"
+          cp /usr/lib/x86_64-linux-gnu/libEGL.so.1 "$APPIMAGE_DIR/usr/lib/" || true
 
           # Build AppImage
           "$APPIMAGETOOL" "$APPIMAGE_DIR" "$BUILD_ARTIFACT_APPIMAGE"
