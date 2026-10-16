@@ -230,7 +230,9 @@ jobs:
           merge-multiple: 'true'
           skip-decompress: 'true'
 
-      - name: Upload build artifacts to release
+      - name: Create release and upload build artifacts
         uses: softprops/action-gh-release@v3
         with:
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
           files: ${{ runner.temp }}/download/*
