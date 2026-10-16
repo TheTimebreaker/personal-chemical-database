@@ -28,9 +28,9 @@ class MoleculeData(TypedDict):
 class NMRData(MoleculeData):
     data_type: Literal["1H NMR", "13C NMR", "19F NMR", "31P NMR"]  # type: ignore
     solvent: str
-    frequency: float
-    data: str
-    source: str
+    frequency: str | float
+    data: str  # type: ignore
+    source: str  # type: ignore
 
 
 class Database:

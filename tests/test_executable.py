@@ -12,7 +12,7 @@ TIMEOUT_SECONDS = 30
 BUFFER_SIZE = 1024
 
 
-def terminate_process(process: subprocess.Popen) -> None:
+def terminate_process(process: subprocess.Popen) -> None:  # type: ignore
     """Terminate the process and its children, cross-platform."""
 
     if process.poll() is not None:
@@ -78,7 +78,7 @@ def print_output(stdout: str, stderr: str) -> None:
     print()
 
 
-def main() -> None:
+def main() -> int:
     parser = argparse.ArgumentParser(description="Start an executable and wait for it to report READY via TCP.")
 
     parser.add_argument(
@@ -114,7 +114,7 @@ def main() -> None:
         # On POSIX, start a new process group so we can terminate
         # the executable and its children together.
         if os.name == "nt":
-            creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
+            creationflags = subprocess.CREATE_NEW_PROCESS_GROUP  # type: ignore
         else:
             creationflags = 0
 
