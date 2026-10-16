@@ -76,24 +76,6 @@ jobs:
         with:
           groups: build
 
-
-      - name: Verify build runtime
-        run: |
-          uv run --no-managed-python python - <<'PY'
-          import sys
-          import _tkinter
-
-          print("Python:", sys.version)
-          print("Python executable:", sys.executable)
-          print("Tcl:", _tkinter.TCL_VERSION)
-          print("Tk:", _tkinter.TK_VERSION)
-
-          assert sys.version_info[:3] == (3, 14, 5), sys.version
-          assert _tkinter.TCL_VERSION in ("8.6", "9.0"), _tkinter.TCL_VERSION
-          assert _tkinter.TK_VERSION in ("8.6", "9.0"), _tkinter.TK_VERSION
-          PY
-
-
       - parallel:
         - name: Run PyInstaller (Linux)
           if: runner.os == 'Linux'

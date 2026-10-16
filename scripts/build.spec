@@ -1,8 +1,8 @@
 import argparse
 import platform
 import subprocess
-from tomllib import load
 from pathlib import Path
+from tomllib import load
 
 from PyInstaller.building.api import COLLECT, EXE, PYZ
 from PyInstaller.building.build_main import Analysis
@@ -22,7 +22,7 @@ if system == "Windows":
     ICON = (Path(".") / "img" / "icon-Win.ico").resolve()
 elif system == "Darwin":
     ICON = (Path(".") / "img" / "icon-Mac.icns").resolve()
-else: #Linux doesn't use built-into-EXE icons
+else:  # Linux doesn't use built-into-EXE icons
     ICON = None
 VERSION = subprocess.check_output(["git", "describe", "--tags", "--abbrev=0"]).decode().strip()
 
@@ -34,7 +34,7 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[],
-    hiddenimports=["PIL._tkinter_finder", "PIL._imagingtk"],
+    hiddenimports=[],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

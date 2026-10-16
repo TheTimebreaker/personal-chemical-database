@@ -1,892 +1,680 @@
 from __future__ import annotations
 
 import logging
-import tkinter as tk
-from tkinter import messagebox, ttk
-from typing import Any, Literal
+from collections.abc import Mapping
+from io import BytesIO
+from typing import Literal, cast, override
 
-from PIL import ImageTk
+import pubchempy
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QMouseEvent, QPixmap
+from PySide6.QtWidgets import (
+    QApplication,
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
+    QHBoxLayout,
+    QInputDialog,
+    QLabel,
+    QLineEdit,
+    QMainWindow,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QTabWidget,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
 from rdkit import Chem
 from rdkit.Chem import Draw
 
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
 from database import Database, Molecule, MoleculeData, NMRData, generate_molecule_data, get_display_name
-from style import configure_ttk_style, style_root
+
+DataType = Literal["1H NMR", "13C NMR", "19F NMR", "31P NMR", "IR", "Mass", "boiling point", "melting point", "color"]
+NMRType = Literal["1H NMR", "13C NMR", "19F NMR", "31P NMR"]
+DATA_TYPES: tuple[DataType, ...] = ("1H NMR", "13C NMR", "19F NMR", "31P NMR", "IR", "Mass", "boiling point", "melting point", "color")
+NMR_TYPES: tuple[NMRType, ...] = ("1H NMR", "13C NMR", "19F NMR", "31P NMR")
 
 
-class AddMolecule(ttk.Frame):
-    padx = 5
-    pady = 5
+def _molecule_sort_key(molecule: Molecule) -> str:
+    name = get_display_name(molecule).lower()
+    return name.translate(str.maketrans("", "", "0123456789-'\","))
 
-    edit_state: Literal["normal", "readonly"] = "normal"
-    viewer_mode: bool = False
 
+class ClickableLabel(QLabel):
+    clicked = Signal()
+
+    @override
+    def mousePressEvent(self, event: QMouseEvent) -> None:
+        self.clicked.emit()
+        super().mousePressEvent(event)
+
+
+class MoleculeDataDialog(QDialog):
     def __init__(
         self,
-        master: ttk.Notebook | None = None,
+        parent: QWidget,
+        data: MoleculeData | NMRData | None,
         *,
-        border: float | str | None = None,
-        borderwidth: float | str | None = None,
-        class_: Any = "",
-        cursor: Any = "",
-        height: int = 0,
-        name: str | None = None,
-        padding: (
-            float
-            | str
-            | tuple[float | str]
-            | tuple[float | str, float | str]
-            | tuple[float | str, float | str, float | str]
-            | tuple[float | str, float | str, float | str, float | str]
-            | None
-        ) = None,
-        relief: Literal["raised", "sunken", "flat", "ridge", "solid", "groove"] | None = None,
-        style: Any = "",
-        takefocus: Any = "",
-        width: int = 0,
-        parent: GUI,
-        root: tk.Tk,
+        read_only: bool = False,
     ) -> None:
-        super().__init__(
-            master,
-            border=border,  # type: ignore
-            borderwidth=borderwidth,  # type: ignore
-            class_=class_,
-            cursor=cursor,
-            height=height,
-            name=name,  # type: ignore
-            padding=padding,  # type: ignore
-            relief=relief,  # type: ignore
-            style=style,
-            takefocus=takefocus,
-            width=width,
-        )
-        self.parent = parent
-        self.root = root
-        self.previous_tab: Browse | AddMolecule | EditMolecule | ViewMolecule | None = None
+        super().__init__(parent)
+        self.setWindowTitle("Data details")
+        self.setMinimumWidth(640)
+        form = QFormLayout()
+        self.form = form
+        type_value = str(data.get("data_type", "")) if data else ""
+        solvent_value = str(data.get("solvent", "")) if data else ""
+        frequency_value = str(data.get("frequency", "")) if data else ""
+        data_value = str(data.get("data", "")) if data else ""
+        source_value = str(data.get("source", "")) if data else ""
+        fields: Mapping[str, QWidget]
 
-        self.inchi_var = tk.StringVar()
-        self.inchikey_var = tk.StringVar()
-        self.smiles_var = tk.StringVar()
-        self.cas_var = tk.StringVar()
-        self.molecule_uuid_var: str | None = None
-        self.compound_names_var: list[str] = []
-        self._new_compound_names: list[str] = []
-        self._deleted_compound_names: list[str] = []  # unused in here, but used in descendants
-        self.data_var: dict[str, MoleculeData | NMRData] = {}
-        self._new_data: list[str] = []
-        self._updated_data: list[str] = []
-        self._deleted_data: list[str] = []  # unused in here, but used in descendants
+        if read_only:
+            self.type_box = None
+            self.solvent_edit = None
+            self.frequency_edit = None
+            self.data_edit = None
+            self.source_edit = None
+            field_values = {
+                "Type": type_value,
+                "Solvent": solvent_value,
+                "Frequency": frequency_value,
+                "Data": data_value,
+                "Source": source_value,
+            }
+            display_fields: dict[str, QLabel] = {}
+            for field_name, value in field_values.items():
+                label = QLabel(value)
+                label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+                label.setWordWrap(field_name == "Data")
+                display_fields[field_name] = label
+            self.display_fields = display_fields
+            fields = display_fields
+        else:
+            self.type_box = QComboBox()
+            self.type_box.addItem("")
+            self.type_box.addItems(DATA_TYPES)
+            self.type_box.setCurrentText(type_value)
+            self.solvent_edit = QLineEdit(solvent_value)
+            self.frequency_edit = QLineEdit(frequency_value)
+            self.data_edit = QTextEdit()
+            self.data_edit.setPlainText(data_value)
+            self.source_edit = QLineEdit(source_value)
+            fields = {
+                "Type": self.type_box,
+                "Solvent": self.solvent_edit,
+                "Frequency": self.frequency_edit,
+                "Data": self.data_edit,
+                "Source": self.source_edit,
+            }
 
-        self._build_ui()
+        for field_name, field_widget in fields.items():
+            row = form.rowCount()
+            form.addRow(f"{field_name}:", field_widget)
+            if field_name == "Solvent":
+                self.solvent_row = row
+            elif field_name == "Frequency":
+                self.frequency_row = row
+            if read_only and field_name in ("Solvent", "Frequency"):
+                form.setRowVisible(row, "NMR" in type_value)
+        layout = QVBoxLayout(self)
+        layout.addLayout(form)
+        self.buttons = QDialogButtonBox()
+        if read_only:
+            self.buttons.addButton(QDialogButtonBox.StandardButton.Close)
+        else:
+            self.buttons.addButton(QDialogButtonBox.StandardButton.Cancel)
+            self.buttons.addButton(QDialogButtonBox.StandardButton.Save)
+        layout.addWidget(self.buttons)
+        self.buttons.accepted.connect(self._validate_and_accept)
+        self.buttons.rejected.connect(self.reject)
+        if self.type_box is not None:
+            self.type_box.currentTextChanged.connect(self._update_nmr_fields)
+            self._update_nmr_fields(self.type_box.currentText())
 
-    def _build_ui(self) -> None:
-        for child in self.winfo_children():
-            child.destroy()
+    def _update_nmr_fields(self, data_type: str) -> None:
+        is_nmr = "NMR" in data_type
+        self.form.setRowVisible(self.solvent_row, is_nmr)
+        self.form.setRowVisible(self.frequency_row, is_nmr)
 
-        self.inchi_label = ttk.Label(self, text="InChI")
-        self.inchi_entry = ttk.Entry(self, textvariable=self.inchi_var, state=self.edit_state)
-        self.inchikey_label = ttk.Label(self, text="InChIKey")
-        self.inchikey_entry = ttk.Entry(self, textvariable=self.inchikey_var, state=self.edit_state)
-        self.smiles_label = ttk.Label(self, text="SMILES")
-        self.smiles_entry = ttk.Entry(self, textvariable=self.smiles_var, state=self.edit_state)
-        self.cas_label = ttk.Label(self, text="CAS")
-        self.cas_entry = ttk.Entry(self, textvariable=self.cas_var, state=self.edit_state)
-        self.names_label = ttk.Label(self, text="Compound name(s)")
-        self.names_entry = ttk.Frame(self)
-        self.data_label = ttk.Label(self, text="Additional data")
-        self.data_entry = ttk.Frame(self)
+    def _validate_and_accept(self) -> None:
+        values = self.values()
+        if not values["Type"] or not values["Data"] or not values["Source"]:
+            QMessageBox.warning(self, "Invalid entry", "Type, data, and source are required.")
+        elif values["Type"] not in DATA_TYPES:
+            QMessageBox.warning(self, "Invalid entry", "Select a supported data type.")
+        else:
+            self.accept()
 
-        self.inchi_label.grid(row=0, column=0, sticky="w", padx=self.padx, pady=self.pady)
-        self.inchi_entry.grid(row=0, column=1, sticky="ew", padx=self.padx, pady=self.pady)
-        self.inchikey_label.grid(row=1, column=0, sticky="w", padx=self.padx, pady=self.pady)
-        self.inchikey_entry.grid(row=1, column=1, sticky="ew", padx=self.padx, pady=self.pady)
-        self.smiles_label.grid(row=2, column=0, sticky="w", padx=self.padx, pady=self.pady)
-        self.smiles_entry.grid(row=2, column=1, sticky="ew", padx=self.padx, pady=self.pady)
-        self.cas_label.grid(row=3, column=0, sticky="w", padx=self.padx, pady=self.pady)
-        self.cas_entry.grid(row=3, column=1, sticky="ew", padx=self.padx, pady=self.pady)
-        self.names_label.grid(row=4, column=0, sticky="nw", padx=self.padx, pady=self.pady)
-        self.names_entry.grid(row=4, column=1, sticky="ew")
-        self.data_label.grid(row=5, column=0, sticky="nw", padx=self.padx, pady=self.pady)
-        self.data_entry.grid(row=5, column=1, sticky="ew")
-
-        self.grid_columnconfigure(1, weight=1)
-
-        self._update_compound_names()
-        self._update_data()
-
-        if self.viewer_mode is True:
-            molecule = Chem.MolFromSmiles(self.smiles_var.get())
-            draw = Draw.MolToImage(molecule, size=(150, 150), backgroundColor="red")
-            drawtk = ImageTk.PhotoImage(draw)
-            xlabel = tk.Label(self, image=drawtk, relief="solid", borderwidth=2)
-            xlabel.bind("<Button-1>", lambda _: self._popup_lewis())
-            xlabel.image = drawtk  # type: ignore
-            xlabel.grid(row=0, column=2, rowspan=6, padx=self.padx, pady=self.pady, sticky="n")
-
-        # --- OK buttons
-
-        separator = ttk.Separator(self, orient="horizontal")
-        separator.grid(row=6, column=0, columnspan=3, sticky="ew", padx=self.padx, pady=self.pady)
-
-        action_frame = ttk.Frame(self)
-        action_frame.grid(row=7, column=0, columnspan=3, sticky="e", padx=self.padx, pady=self.pady)
-
-        self.autofill_button = ttk.Button(action_frame, text="Autofill", command=self._autofill)
-        self.confirm_button = ttk.Button(action_frame, text="Confirm", command=self._confirm)
-        self.clear_button = ttk.Button(action_frame, text="Clear", command=self._clear)
-
-        self.autofill_button.pack(side="left", padx=self.padx, pady=self.pady)
-        self.clear_button.pack(side="right", padx=self.padx, pady=self.pady)
-        self.confirm_button.pack(side="right", padx=self.padx, pady=self.pady)
-
-    def _update_ui_from_database(self, molecule_uuid: str) -> None:
-        logging.info("EDITING molecule_uuid=%s", molecule_uuid)
-        molecule = self.parent.database.by_uuid[molecule_uuid]
-        self._clear()  # Clear potential leftovers, so we dont get crossovers
-
-        self.inchi_var.set(molecule["inchi"])
-        self.inchikey_var.set(molecule["inchikey"])
-        self.smiles_var.set(molecule["smiles"])
-        if molecule.get("cas", None):
-            self.cas_var.set(molecule.get("cas"))  # type: ignore
-        if molecule.get("names", None):
-            self.compound_names_var = molecule.get("names")  # type: ignore
-        mol_data_uuids = self.parent.database.get_data_uuids(molecule_uuid)
-        logging.info("data uuids found: mol_data_uuids=%s", mol_data_uuids)
-        if mol_data_uuids:
-            for data_uuid in mol_data_uuids:
-                self.data_var[data_uuid] = self.parent.database.read_data(molecule_uuid, data_uuid)
-        self.molecule_uuid_var = molecule_uuid
-        self._build_ui()
-
-    def _update_compound_names(self) -> None:
-        for child in self.names_entry.winfo_children():
-            child.destroy()
-
-        frame = ttk.Frame(self.names_entry)
-        frame.pack(fill="x", expand=True)
-        frame.columnconfigure(0, weight=1)
-        for i, name in enumerate(self.compound_names_var):
-            marked_for_deletion = name in self._deleted_compound_names
-            marked_as_new = name in self._new_compound_names
-            if marked_for_deletion:
-                styl = "Deleted.TLabel"
-            elif marked_as_new:
-                styl = "New.TLabel"
-            else:
-                styl = ""
-
-            ttk.Label(frame, text=name, style=styl).grid(row=i, column=0, sticky="ew", padx=self.padx, pady=self.pady)
-
-            if not self.viewer_mode:
-                if marked_for_deletion:
-                    ttk.Button(
-                        frame,
-                        text="Undo",
-                        command=lambda name=name: self._remove_this_name_undo(name),  # type: ignore
-                    ).grid(row=i, column=1, padx=self.padx, pady=0)
-                else:
-                    ttk.Button(
-                        frame,
-                        text="Delete",
-                        command=lambda name=name: self._remove_this_name(name),  # type: ignore
-                    ).grid(row=i, column=1, padx=self.padx, pady=0)
-
-        if not self.viewer_mode:
-            button_add_names = ttk.Button(self.names_entry, text="Add name", command=self._open_add_name_dialog)
-            button_add_names.pack(fill="x", expand=True, padx=self.padx, pady=self.pady)
-
-    def _update_data(self) -> None:
-        for child in self.data_entry.winfo_children():
-            child.destroy()
-
-        frame = ttk.Frame(self.data_entry)
-        frame.pack(fill="x", expand=True)
-        frame.columnconfigure(0, weight=1)
-        for i, (data_uuid, data) in enumerate(self.data_var.items()):
-            marked_for_deletion = data_uuid in self._deleted_data
-            marked_as_new = data_uuid in self._new_data
-            marked_as_edited = data_uuid in self._updated_data
-            if marked_for_deletion:
-                styl = "Deleted.TLabel"
-            elif marked_as_new:
-                styl = "New.TLabel"
-            elif marked_as_edited:
-                styl = "Edited.TLabel"
-            else:
-                styl = ""
-
-            if data.get("frequency", None) and data.get("solvent", None):
-                label_text = f"#{i}-{data["data_type"]} ({data.get("frequency")} / {data.get("solvent")})"
-            else:
-                label_text = f"#{i}-{data["data_type"]}"
-
-            lab = ttk.Label(frame, text=label_text, style=styl)
-            lab.bind("<Button-1>", lambda _event, data_uuid=data_uuid, data=data: self.open_data_dialog(data=data, data_uuid=data_uuid))  # type: ignore
-            lab.grid(row=i, column=0, sticky="ew", padx=self.padx, pady=self.pady)
-            if not self.viewer_mode:
-                if marked_for_deletion:
-                    ttk.Button(
-                        frame,
-                        text="Undo",
-                        command=lambda data_uuid=data_uuid: self._remove_this_data_undo(data_uuid),  # type: ignore
-                    ).grid(row=i, column=1, padx=self.padx, pady=0)
-                else:
-                    ttk.Button(
-                        frame,
-                        text="Delete",
-                        command=lambda data_uuid=data_uuid: self._remove_this_data(data_uuid),  # type: ignore
-                    ).grid(row=i, column=1, padx=self.padx, pady=0)
-
-        if not self.viewer_mode:
-            button_add_data = ttk.Button(self.data_entry, text="Add data", command=self.open_data_dialog)
-            button_add_data.pack(fill="x", expand=True, padx=self.padx, pady=self.pady)
-
-    def _popup_lewis(self) -> None:
-        dialog = tk.Toplevel(self)
-        dialog.update_idletasks()
-        dialog.title("LEWIS structure")
-        dialog.transient(self.root)
-        dialog.grab_set()
-
-        smiles = self.smiles_var.get()
-        if not smiles:
-            return
-
-        molecule = Chem.MolFromSmiles(smiles)
-        draw = Draw.MolToImage(molecule)
-        drawtk = ImageTk.PhotoImage(draw)
-        xlabel = tk.Label(dialog, image=drawtk)
-        xlabel.image = drawtk  # type: ignore
-        xlabel.pack()
-
-        dialog.bind("<Return>", lambda _event: dialog.destroy())
-
-    def _open_add_name_dialog(self) -> None:
-        dialog = tk.Toplevel(self)
-        dialog.title("Add compound name")
-        dialog.transient(self.root)
-        dialog.grab_set()
-
-        entry_var = tk.StringVar()
-        label = ttk.Label(dialog, text="Compound name:")
-        entry = ttk.Entry(dialog, textvariable=entry_var)
-        button_frame = ttk.Frame(dialog)
-        button_confirm = ttk.Button(button_frame, text="Confirm", command=lambda: self._confirm_add_name(dialog, entry_var))
-        button_cancel = ttk.Button(button_frame, text="Cancel", command=dialog.destroy)
-
-        label.grid(row=0, column=0, sticky="w", padx=self.padx, pady=self.pady)
-        entry.grid(row=0, column=1, sticky="ew", padx=self.padx, pady=self.pady)
-        button_frame.grid(row=1, column=0, columnspan=2, sticky="e", padx=self.padx, pady=self.pady)
-        button_cancel.pack(side="right", padx=self.padx, pady=self.pady)
-        button_confirm.pack(side="right", padx=self.padx, pady=self.pady)
-
-        dialog.grid_columnconfigure(1, weight=1)
-        entry.focus_set()
-        dialog.bind("<Return>", lambda _: self._confirm_add_name(dialog, entry_var))
-
-    def open_data_dialog(
-        self,
-        *,
-        molecule_uuid: str | None = None,
-        data_uuid: str | None = None,
-        data: MoleculeData | NMRData | None = None,
-    ) -> None:
-        def _build_ui() -> None:
-            for child in dialog.winfo_children():
-                child.destroy()
-
-            dialog.entries = []
-            for row, label_text in enumerate(fields.keys()):
-                if label_text in ("Solvent", "Frequency") and "NMR" not in fields["Type"].get():
-                    continue
-                ttk.Label(dialog, text=f"{label_text}:").grid(row=row, column=0, sticky="w", padx=5, pady=5)
-                if label_text in ("Type",):
-                    el = ttk.Combobox(
-                        dialog,
-                        textvariable=fields[label_text],
-                        values=["1H NMR", "13C NMR", "19F NMR", "31P NMR", "IR", "Mass", "boiling point", "melting point", "color"],
-                        state="readonly",
-                    )
-                    el.bind("<<ComboboxSelected>>", lambda _: _build_ui())
-                else:
-                    el = ttk.Entry(dialog, textvariable=fields[label_text])
-                el.configure(state=self.edit_state)
-                el.grid(row=row, column=1, sticky="ew", padx=5, pady=5)
-                dialog.entries.append(el)
-
-            if self.viewer_mode is False:
-                button_frame = ttk.Frame(dialog)
-                button_confirm = ttk.Button(button_frame, text="Confirm", command=lambda: self._confirm_add_data(dialog, fields, data_uuid))
-                button_cancel = ttk.Button(button_frame, text="Cancel", command=dialog.destroy)
-                button_frame.grid(row=row + 1, column=0, columnspan=2, sticky="e", padx=self.padx, pady=self.pady)
-                button_cancel.pack(side="right", padx=self.padx, pady=self.pady)
-                button_confirm.pack(side="right", padx=self.padx, pady=self.pady)
-
-        if data is None:
-            if molecule_uuid and data_uuid:
-                data = self.parent.database.read_data(molecule_uuid, data_uuid)
-            else:
-                data = {}  # type: ignore
-        logging.info(data)
-        if data is None:
-            raise ValueError
-
-        dialog = tk.Toplevel(self.root)
-        dialog.title("Data details")
-        dialog.transient(self.root)
-        dialog.resizable(True, False)
-
-        fields: dict[Literal["Type", "Solvent", "Frequency", "Data", "Source"], tk.StringVar] = {
-            "Type": tk.StringVar(value=str(data.get("data_type", ""))),
-            "Solvent": tk.StringVar(value=str(data.get("solvent", ""))),
-            "Frequency": tk.StringVar(value=str(data.get("frequency", ""))),
-            "Data": tk.StringVar(value=str(data.get("data", ""))),
-            "Source": tk.StringVar(value=str(data.get("source", ""))),
+    def values(self) -> dict[str, str]:
+        if self.type_box is None or self.solvent_edit is None or self.frequency_edit is None or self.data_edit is None or self.source_edit is None:
+            raise RuntimeError("Read-only data details do not have editable values.")
+        return {
+            "Type": self.type_box.currentText().strip(),
+            "Solvent": self.solvent_edit.text().strip(),
+            "Frequency": self.frequency_edit.text().strip(),
+            "Data": self.data_edit.toPlainText().strip(),
+            "Source": self.source_edit.text().strip(),
         }
 
-        dialog.fields = fields  # type: ignore
-        _build_ui()
 
-        dialog.bind("<Return>", lambda _: self._confirm_add_data(dialog, fields, data_uuid))
-        dialog.columnconfigure(1, weight=1)
-        dialog.minsize(640, 0)
+class AddMolecule(QWidget):
+    def __init__(self, parent: GUI, *, mode: Literal["add", "edit", "view"] = "add") -> None:
+        super().__init__(parent)
+        self.app_window = parent
+        self.mode = mode
+        self.previous_tab: QWidget | None = None
+        self.molecule_uuid: str | None = None
+        self.compound_names: list[str] = []
+        self._new_compound_names: set[str] = set()
+        self._deleted_compound_names: set[str] = set()
+        self.data: dict[str, MoleculeData | NMRData] = {}
+        self._new_data: set[str] = set()
+        self._updated_data: set[str] = set()
+        self._deleted_data: set[str] = set()
 
-        dialog.wait_visibility()
-        dialog.grab_set()
+        self.inchi_edit = QLineEdit()
+        self.inchikey_edit = QLineEdit()
+        self.smiles_edit = QLineEdit()
+        self.cas_edit = QLineEdit()
+        self.names_layout = QVBoxLayout()
+        self.data_layout = QVBoxLayout()
+        self.structure_label = ClickableLabel()
+        self.structure_label.clicked.connect(self._show_structure)
+        self.structure_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.structure_label.setFixedSize(180, 180)
+        self.structure_label.setStyleSheet("border: 1px solid palette(mid);")
 
-    def _remove_this_name(self, name: str) -> None:
-        self._deleted_compound_names.append(name)
-        if name in self._new_compound_names:
-            self._new_compound_names.remove(name)
+        self._build_ui()
+
+    @property
+    def viewer_mode(self) -> bool:
+        return self.mode == "view"
+
+    def _build_ui(self) -> None:
+        outer = QVBoxLayout(self)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        content = QWidget()
+        content_layout = QVBoxLayout(content)
+
+        top = QHBoxLayout()
+        form = QFormLayout()
+        form.addRow("InChI:", self.inchi_edit)
+        form.addRow("InChIKey:", self.inchikey_edit)
+        form.addRow("SMILES:", self.smiles_edit)
+        form.addRow("CAS:", self.cas_edit)
+        top.addLayout(form, 1)
+        if self.viewer_mode:
+            top.addWidget(self.structure_label)
+        content_layout.addLayout(top)
+
+        names_heading = QLabel("Compound name(s)")
+        names_heading.setStyleSheet("font-weight: bold;")
+        content_layout.addWidget(names_heading)
+        content_layout.addLayout(self.names_layout)
+
+        data_heading = QLabel("Additional data")
+        data_heading.setStyleSheet("font-weight: bold;")
+        content_layout.addWidget(data_heading)
+        content_layout.addLayout(self.data_layout)
+        content_layout.addStretch(1)
+        scroll.setWidget(content)
+        outer.addWidget(scroll, 1)
+
+        for widget in (self.inchi_edit, self.inchikey_edit, self.smiles_edit, self.cas_edit):
+            widget.setReadOnly(self.viewer_mode)
+
+        if not self.viewer_mode:
+            self._append_add_name_button()
+            self._append_add_data_button()
+
+        actions = QHBoxLayout()
+        actions.addStretch(1)
+        if self.mode == "add":
+            autofill_button = QPushButton("Autofill")
+            autofill_button.clicked.connect(self._autofill)
+            actions.addWidget(autofill_button)
+        if self.mode == "view":
+            confirm_text = "Exit Viewer"
+        elif self.mode == "edit":
+            confirm_text = "Save"
+        else:
+            confirm_text = "Confirm"
+        self.confirm_button = QPushButton(confirm_text)
+        self.confirm_button.clicked.connect(self._confirm)
+        actions.addWidget(self.confirm_button)
+        self.clear_button = QPushButton("Cancel" if self.mode == "edit" else ("Exit Viewer" if self.viewer_mode else "Clear"))
+        self.clear_button.clicked.connect(self._clear)
+        if self.viewer_mode:
+            self.confirm_button.hide()
+        actions.addWidget(self.clear_button)
+        outer.addLayout(actions)
+
         self._update_compound_names()
-
-    def _remove_this_name_undo(self, name: str) -> None:
-        try:
-            self._deleted_compound_names.remove(name)
-        except ValueError:
-            messagebox.showerror(
-                title="How did we get here?",
-                message="I do not understand how this is possible, but the compound name you are trying to UNDO isn't marked for deletion anymore.",
-            )
-        self._update_compound_names()
-
-    def _remove_this_data(self, data_uuid: str) -> None:
-        self._deleted_data.append(data_uuid)
         self._update_data()
 
-    def _remove_this_data_undo(self, data_uuid: str) -> None:
-        try:
-            self._deleted_data.remove(data_uuid)
+    def _update_compound_names(self) -> None:
+        self._clear_layout(self.names_layout)
+        for name in self.compound_names:
+            row = QHBoxLayout()
+            label = QPushButton(name)
+            status_style = self._status_style(name in self._deleted_compound_names, name in self._new_compound_names)
+            label.setStyleSheet(f"{status_style} text-align: left;")
+            label.setFlat(True)
+            label.setToolTip("Click to copy")
+            label.clicked.connect(lambda _checked=False, value=name: QApplication.clipboard().setText(value))
+            row.addWidget(label, 1)
+            if not self.viewer_mode:
+                if name in self._deleted_compound_names:
+                    button = QPushButton("Undo")
+                    button.clicked.connect(lambda _checked=False, current=name: self._undo_remove_name(current))
+                else:
+                    button = QPushButton("Delete")
+                    button.clicked.connect(lambda _checked=False, current=name: self._remove_name(current))
+                row.addWidget(button)
+            self.names_layout.addLayout(row)
+        if not self.viewer_mode:
+            self._append_add_name_button()
 
-        except ValueError:
-            messagebox.showerror(
-                title="How did we get here?",
-                message="I do not understand how this is possible, but the data UUID you are trying to UNDO isn't marked for deletion anymore.",
-            )
-        self._update_data()
-
-    def _confirm_add_name(self, dialog: tk.Toplevel, entry_var: tk.StringVar) -> None:
-        value = entry_var.get().strip()
-        if value:
-            if value not in self.compound_names_var:
-                self.compound_names_var.append(value)
-            self._new_compound_names.append(value)
-            if value in self._deleted_compound_names:
-                self._deleted_compound_names.remove(value)
-            self._update_compound_names()
-            dialog.destroy()
-        else:
-            messagebox.showerror(
-                title="Invalid entry", message="The field was detected as being empty, which is disallowed (and would not make any sense)."
-            )
-
-    def _confirm_add_data(
-        self, dialog: tk.Toplevel, fields: dict[Literal["Type", "Solvent", "Frequency", "Data", "Source"], tk.StringVar], data_uuid: str | None = None
-    ) -> None:
-        # get all the variables
-        type_value = fields["Type"].get().strip()
-        solvent_value = fields["Solvent"].get().strip()
-        frequency_value = fields["Frequency"].get().strip()
-        data_value = fields["Data"].get().strip()
-        source_value = fields["Source"].get().strip()
-
-        # Data UUID
-        if data_uuid is None:
-            data_uuid = self.parent.database._gen_uuid()
-
-        if "NMR" in type_value:
-            data_obj = NMRData(data_type=type_value, data=data_value, source=source_value, solvent=solvent_value, frequency=frequency_value)  # type: ignore
-        else:
-            data_obj = MoleculeData(data_type=type_value, data=data_value, source=source_value)  # type: ignore
-
-        if type_value and data_value and source_value:
-            if data_uuid not in self.data_var:
-                self._new_data.append(data_uuid)
+    def _update_data(self) -> None:
+        self._clear_layout(self.data_layout)
+        for index, (data_uuid, data) in enumerate(self.data.items()):
+            row = QHBoxLayout()
+            if data.get("frequency") and data.get("solvent"):
+                text = f"#{index}-{data['data_type']} ({data.get('frequency')} / {data.get('solvent')})"
             else:
-                self._updated_data.append(data_uuid)
+                text = f"#{index}-{data['data_type']}"
+            label = QPushButton(text)
+            status_style = self._status_style(data_uuid in self._deleted_data, data_uuid in self._new_data, data_uuid in self._updated_data)
+            label.setStyleSheet(f"{status_style} text-align: left;")
+            label.setFlat(True)
+            label.setEnabled(True)
+            label.clicked.connect(lambda _checked=False, key=data_uuid: self.open_data_dialog(data_uuid=key))
+            row.addWidget(label, 1)
+            if not self.viewer_mode:
+                if data_uuid in self._deleted_data:
+                    button = QPushButton("Undo")
+                    button.clicked.connect(lambda _checked=False, key=data_uuid: self._undo_remove_data(key))
+                else:
+                    button = QPushButton("Delete")
+                    button.clicked.connect(lambda _checked=False, key=data_uuid: self._remove_data(key))
+                row.addWidget(button)
+            self.data_layout.addLayout(row)
+        if not self.viewer_mode:
+            self._append_add_data_button()
 
-            self.data_var[data_uuid] = data_obj
-            self._update_data()
-            dialog.destroy()
+    def _append_add_name_button(self) -> None:
+        button = QPushButton("Add name")
+        button.clicked.connect(self._open_add_name_dialog)
+        self.names_layout.addWidget(button)
+
+    def _append_add_data_button(self) -> None:
+        button = QPushButton("Add data")
+        button.clicked.connect(self.open_data_dialog)
+        self.data_layout.addWidget(button)
+
+    @staticmethod
+    def _status_style(deleted: bool, added: bool = False, edited: bool = False) -> str:
+        if deleted:
+            return "color: red;"
+        if added:
+            return "color: green;"
+        if edited:
+            return "color: blue;"
+        return ""
+
+    @staticmethod
+    def _clear_layout(layout: QVBoxLayout) -> None:
+        while layout.count():
+            item = layout.takeAt(0)
+            if item is None:
+                continue
+            if child := item.layout():
+                while child.count():
+                    child_item = child.takeAt(0)
+                    if child_item is not None and (widget := child_item.widget()):
+                        widget.deleteLater()
+            elif widget := item.widget():
+                widget.deleteLater()
+
+    def _open_add_name_dialog(self) -> None:
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Add compound name")
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(QLabel("Compound name:"))
+        entry = QLineEdit()
+        layout.addWidget(entry)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Cancel | QDialogButtonBox.StandardButton.Save)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            name = entry.text().strip()
+            if not name:
+                QMessageBox.warning(self, "Invalid entry", "A compound name cannot be empty.")
+                return
+            if name not in self.compound_names:
+                self.compound_names.append(name)
+                self._new_compound_names.add(name)
+            self._deleted_compound_names.discard(name)
+            self._update_compound_names()
+
+    def open_data_dialog(self, *, data_uuid: str | None = None) -> None:
+        existing = self.data.get(data_uuid) if data_uuid else None
+        dialog = MoleculeDataDialog(self, existing, read_only=self.viewer_mode)
+        if dialog.exec() != QDialog.DialogCode.Accepted or self.viewer_mode:
+            return
+        values = dialog.values()
+        data_type = cast(DataType, values["Type"])
+        if data_type in NMR_TYPES:
+            data_record: MoleculeData | NMRData = NMRData(
+                data_type=cast(NMRType, data_type),
+                data=values["Data"],
+                source=values["Source"],
+                solvent=values["Solvent"],
+                frequency=values["Frequency"],
+            )
         else:
-            messagebox.showerror(title="Invalid entry", message="Some values were detected as being empty, which is disallowed.")
+            data_record = MoleculeData(data_type=data_type, data=values["Data"], source=values["Source"])
+
+        if data_uuid is None:
+            data_uuid = self.app_window.database._gen_uuid()
+            self._new_data.add(data_uuid)
+        else:
+            self._updated_data.add(data_uuid)
+            self._deleted_data.discard(data_uuid)
+        self.data[data_uuid] = data_record
+        self._update_data()
+
+    def _remove_name(self, name: str) -> None:
+        self._deleted_compound_names.add(name)
+        self._new_compound_names.discard(name)
+        self._update_compound_names()
+
+    def _undo_remove_name(self, name: str) -> None:
+        self._deleted_compound_names.discard(name)
+        self._update_compound_names()
+
+    def _remove_data(self, data_uuid: str) -> None:
+        if data_uuid in self._new_data:
+            self.data.pop(data_uuid, None)
+            self._new_data.discard(data_uuid)
+            self._updated_data.discard(data_uuid)
+            self._deleted_data.discard(data_uuid)
+            self._update_data()
+            return
+        self._deleted_data.add(data_uuid)
+        self._update_data()
+
+    def _undo_remove_data(self, data_uuid: str) -> None:
+        self._deleted_data.discard(data_uuid)
+        self._update_data()
+
+    def _show_structure(self) -> None:
+        smiles = self.smiles_edit.text()
+        if not smiles:
+            return
+        molecule = Chem.MolFromSmiles(smiles)
+        if molecule is None:
+            QMessageBox.warning(self, "Invalid structure", "The SMILES value could not be rendered.")
+            return
+        image = Draw.MolToImage(molecule, size=(600, 600))
+        buffer = BytesIO()
+        image.save(buffer, format="PNG")
+        pixmap = QPixmap()
+        pixmap.loadFromData(buffer.getvalue())
+        dialog = QDialog(self)
+        dialog.setWindowTitle("LEWIS structure")
+        layout = QVBoxLayout(dialog)
+        image_label = QLabel()
+        image_label.setPixmap(pixmap)
+        layout.addWidget(image_label)
+        dialog.exec()
 
     def _autofill(self) -> None:
-        inchi: str | None = self.inchi_var.get()
-        if not inchi:
-            inchi = None
-        inchikey: str | None = self.inchikey_var.get()
-        if not inchikey:
-            inchikey = None
-        smiles: str | None = self.smiles_var.get()
-        if not smiles:
-            smiles = None
-        cas: str | None = self.cas_var.get()
-        if not cas:
-            cas = None
-        names: list[str] | None = self.compound_names_var
-        name: str | None
-        if not names:
-            name = None
-        else:
-            name = names[0]
-
+        values = {
+            "inchi": self.inchi_edit.text().strip() or None,
+            "inchikey": self.inchikey_edit.text().strip() or None,
+            "smiles": self.smiles_edit.text().strip() or None,
+            "cas": self.cas_edit.text().strip() or None,
+            "compound_name": self.compound_names[0] if self.compound_names else None,
+        }
         try:
-            molecule = generate_molecule_data(inchi=inchi, inchikey=inchikey, smiles=smiles, cas=cas, compound_name=name)
-        except ValueError:
-            messagebox.showerror(
-                title="Autofill not successfull",
-                message="Autofilling was not successfull from the entered values. Make sure to give atleast one of the above values and if you did "
-                "and it still failed, enter a value for another field.",
+            molecule = generate_molecule_data(
+                inchi=values["inchi"],
+                inchikey=values["inchikey"],
+                smiles=values["smiles"],
+                cas=values["cas"],
+                compound_name=values["compound_name"],
+                choose_compound=self._choose_pubchem_compound,
             )
+        except ValueError as error:
+            QMessageBox.warning(self, "Autofill unsuccessful", str(error))
             return
+        self.inchi_edit.setText(molecule["inchi"])
+        self.inchikey_edit.setText(molecule["inchikey"])
+        self.smiles_edit.setText(molecule["smiles"])
+        self.cas_edit.setText(molecule["cas"] or "")
+        if molecule["names"]:
+            self.compound_names = molecule["names"]
+            self._update_compound_names()
 
-        if molecule:
-            if molecule["inchi"]:
-                self.inchi_var.set(molecule["inchi"])
-            if molecule["inchikey"]:
-                self.inchikey_var.set(molecule["inchikey"])
-            if molecule["smiles"]:
-                self.smiles_var.set(molecule["smiles"])
-            if molecule["cas"]:
-                self.cas_var.set(molecule["cas"])
-            if molecule["names"]:
-                self.compound_names_var = molecule["names"]
+    def _choose_pubchem_compound(self, compounds: list[pubchempy.Compound]) -> pubchempy.Compound | None:
+        names = [f"{getattr(compound, 'iupac_name', None) or 'Compound'} (CID {compound.cid})" for compound in compounds]
+        choice, accepted = QInputDialog.getItem(self, "Select compound", "Multiple matches were found:", names, 0, False)
+        if not accepted:
+            return None
+        return compounds[names.index(choice)]
 
     def _confirm(self) -> None:
-        inchi = self.inchi_var.get()
-        inchikey = self.inchikey_var.get()
-        smiles = self.smiles_var.get()
-        cas: str | None = self.cas_var.get()
-        if not cas:
-            cas = None
-        names: list[str] | None = self.compound_names_var
-        if not names:
-            names = None
-        names = [x for x in self.compound_names_var if x not in self._deleted_compound_names]
-        if any(not x for x in (inchi, inchikey, smiles)):
-            return
-        molecule = Molecule(inchi=inchi, inchikey=inchikey, smiles=smiles, cas=cas, names=names)
-
-        if self.parent.database.is_this_in_db(molecule=molecule):
-            messagebox.showerror(title="Adding molecule not successfull", message="This molecule is a duplicate and already exists in the database.")
-            return
-
-        if self.parent.database.create_entry(molecule):
-            self.parent.database.__init__()  # type: ignore
-
-            molecule_uuid = self.parent.database.by_inchi[inchi]
-            existing_data_uuids = self.parent.database.get_data_uuids(molecule_uuid)
-            for data_uuid, data in self.data_var.items():
-                molecule_has_data = bool(existing_data_uuids)
-                data_exists = data_uuid in existing_data_uuids
-                data_updated = data_uuid in self._updated_data
-                data_was_deleted = data_uuid in self._deleted_data
-                if data_was_deleted:
-                    self.parent.database.delete_data(molecule_uuid=molecule_uuid, data_uuid=data_uuid)
-                elif not molecule_has_data or not data_exists:
-                    self.parent.database.add_data(molecule_uuid, data=data, data_uuid=data_uuid)
-                elif data_updated:
-                    self.parent.database.modify_data(molecule_uuid, data=data, data_uuid=data_uuid)
-
+        if self.viewer_mode:
             self._clear()
-
-            self.parent.browse_tab._build_ui()
-            self._build_ui()
-        else:
-            messagebox.showerror(
-                title="Adding molecule not successfull", message="The molecule could not be added successfully for an unknown reason."
-            )
-
-    def _clear(self) -> None:
-        self.inchi_var = tk.StringVar()
-        self.inchikey_var = tk.StringVar()
-        self.smiles_var = tk.StringVar()
-        self.cas_var = tk.StringVar()
-        self.compound_names_var = []
-        self._new_compound_names = []
-        self._deleted_compound_names = []
-        self.data_var = {}
-        self._new_data = []
-        self._updated_data = []
-        self._deleted_data = []
-
-        self._build_ui()
-        if self.previous_tab is not None:
-            self.parent.notebook.select(self.previous_tab)
-
-
-class EditMolecule(AddMolecule):
-    edit_state = "normal"
-
-    def _build_ui(self) -> None:
-        super()._build_ui()
-        self.autofill_button.pack_forget()
-        self.clear_button.configure(text="Cancel")
-
-    def _confirm(self) -> None:
-        inchi = self.inchi_var.get()
-        inchikey = self.inchikey_var.get()
-        smiles = self.smiles_var.get()
-        cas: str | None = self.cas_var.get()
-        if not cas:
-            cas = None
-        names = [x for x in self.compound_names_var if x not in self._deleted_compound_names]
-
-        molecule_uuid = self.molecule_uuid_var
-        if not molecule_uuid:
-            logging.error("Could not commit EDITs, molecule UUID was not assigned.")
-            return  # ERROR
-
-        if any(not x for x in (inchi, inchikey, smiles)):
-            logging.error("Could not commit EDITs, atleast one required value was empty.")
             return
-        molecule = Molecule(inchi=inchi, inchikey=inchikey, smiles=smiles, cas=cas, names=names)
+        inchi = self.inchi_edit.text().strip()
+        inchikey = self.inchikey_edit.text().strip()
+        smiles = self.smiles_edit.text().strip()
+        if not inchi or not inchikey or not smiles:
+            QMessageBox.warning(self, "Invalid molecule", "InChI, InChIKey, and SMILES are required.")
+            return
 
-        if self.parent.database.overwrite_entry(molecule_uuid=molecule_uuid, molecule=molecule):
-            self.parent.database.__init__()  # type: ignore
-
-            existing_data_uuids = self.parent.database.get_data_uuids(molecule_uuid)
-            for data_uuid, data in self.data_var.items():
-                molecule_has_data = bool(existing_data_uuids)
-                data_exists = data_uuid in existing_data_uuids
-                data_updated = data_uuid in self._updated_data
-                data_was_deleted = data_uuid in self._deleted_data
-                print(data_uuid, self._deleted_data, data_was_deleted)
-                if data_was_deleted:
-                    self.parent.database.delete_data(molecule_uuid=molecule_uuid, data_uuid=data_uuid)
-                elif not molecule_has_data or not data_exists:
-                    logging.info("committing new data for molecule %s datauuid %s to database: %s", molecule_uuid, data_uuid, data)
-                    self.parent.database.add_data(molecule_uuid, data=data, data_uuid=data_uuid)
-                elif data_updated:
-                    self.parent.database.modify_data(molecule_uuid, data=data, data_uuid=data_uuid)
-
-            self._clear()
-            self.parent.browse_tab._build_ui()
-        else:
-            messagebox.showerror(
-                title="Adding molecule not successfull", message="The molecule could not be added successfully for an unknown reason."
-            )
-
-    def _clear(self) -> None:
-        super()._clear()
-        self.parent._toggle_edit_off()
-
-
-class ViewMolecule(AddMolecule):
-    edit_state = "readonly"
-    viewer_mode = True
-
-    def _build_ui(self) -> None:
-        super()._build_ui()
-        self.autofill_button.pack_forget()
-        self.confirm_button.pack_forget()
-        self.clear_button.configure(text="Exit Viewer")
-
-    def _clear(self) -> None:
-        super()._clear()
-        self.parent._toggle_view_off()
-
-
-class Browse(ttk.Frame):
-    padx = 5
-    pady = 5
-
-    def __init__(
-        self,
-        master: ttk.Notebook | None = None,
-        *,
-        border: float | str | None = None,
-        borderwidth: float | str | None = None,
-        class_: Any = "",
-        cursor: Any = "",
-        height: int = 0,
-        name: str | None = None,
-        padding: (
-            float
-            | str
-            | tuple[float | str]
-            | tuple[float | str, float | str]
-            | tuple[float | str, float | str, float | str]
-            | tuple[float | str, float | str, float | str, float | str]
-            | None
-        ) = None,
-        relief: Literal["raised", "sunken", "flat", "ridge", "solid", "groove"] | None = None,
-        style: Any = "",
-        takefocus: Any = "",
-        width: int = 0,
-        parent: GUI,
-        root: tk.Tk,
-    ) -> None:
-        super().__init__(
-            master,
-            border=border,  # type: ignore
-            borderwidth=borderwidth,  # type: ignore
-            class_=class_,
-            cursor=cursor,
-            height=height,
-            name=name,  # type: ignore
-            padding=padding,  # type: ignore
-            relief=relief,  # type: ignore
-            style=style,
-            takefocus=takefocus,
-            width=width,
+        molecule = Molecule(
+            inchi=inchi,
+            inchikey=inchikey,
+            smiles=smiles,
+            cas=self.cas_edit.text().strip() or None,
+            names=[name for name in self.compound_names if name not in self._deleted_compound_names] or None,
         )
-        self.parent = parent
-        self.root = root
-        self._wheel_delta = 0
-        self._build_ui()
+        if self.mode == "add":
+            if self.app_window.database.is_this_in_db(molecule=molecule):
+                QMessageBox.warning(self, "Duplicate molecule", "This molecule is already in the database.")
+                return
+            if not self.app_window.database.create_entry(molecule):
+                QMessageBox.critical(self, "Save failed", "The molecule could not be added to the database.")
+                return
+            self.app_window.database = Database()
+            saved_molecule_uuid = self.app_window.database.by_inchi[inchi]
+        else:
+            if self.molecule_uuid is None:
+                logging.error("Cannot save molecule edits: molecule UUID was not assigned.")
+                QMessageBox.critical(self, "Save failed", "The molecule could not be saved.")
+                return
+            saved_molecule_uuid = self.molecule_uuid
+            if not self.app_window.database.overwrite_entry(molecule_uuid=saved_molecule_uuid, molecule=molecule):
+                QMessageBox.critical(self, "Save failed", "The molecule could not be saved.")
+                return
 
-    def _build_ui(self) -> None:
-        def _on_mousewheel(event: Any) -> Literal["break"]:
-            self._wheel_delta += event.delta
-            steps = int(self._wheel_delta / 120)
-            if steps:
-                self.scroll_canvas.yview_scroll(-steps, "units")
-                self._wheel_delta -= steps * 120
-            return "break"
+        self._save_data(saved_molecule_uuid)
+        self.app_window.database = Database()
+        self.app_window.browse_tab.populate()
+        if self.mode == "add":
+            self._clear()
+        else:
+            self.app_window._close_temporary_tab(self)
 
-        def _on_touchpad_scroll(event: Any) -> Literal["break"]:
-            _delta_x, delta_y = self.scroll_canvas.tk.splitlist(
-                self.scroll_canvas.tk.call(
-                    "tk::PreciseScrollDeltas",
-                    event.delta,
-                )
-            )
-            delta_y = int(delta_y)
-            if delta_y:
-                self.scroll_canvas.yview_scroll(
-                    -1 if delta_y > 0 else 1,
-                    "units",
-                )
-            return "break"
+    def _save_data(self, molecule_uuid: str) -> None:
+        existing_data_uuids = set(self.app_window.database.get_data_uuids(molecule_uuid))
+        for data_uuid, data in self.data.items():
+            if data_uuid in self._deleted_data:
+                self.app_window.database.delete_data(molecule_uuid=molecule_uuid, data_uuid=data_uuid)
+            elif data_uuid in self._new_data or data_uuid not in existing_data_uuids:
+                self.app_window.database.add_data(molecule_uuid, data=data, data_uuid=data_uuid)
+            elif data_uuid in self._updated_data:
+                self.app_window.database.modify_data(molecule_uuid, data=data, data_uuid=data_uuid)
 
-        def _on_linux_wheel(event: Any) -> Literal["break"]:
-            if event.num == 4:
-                self.scroll_canvas.yview_scroll(-1, "units")
-            elif event.num == 5:
-                self.scroll_canvas.yview_scroll(1, "units")
-            return "break"
+    def _load_molecule(self, molecule_uuid: str) -> None:
+        molecule = self.app_window.database.by_uuid[molecule_uuid]
+        self._reset_fields()
+        self.inchi_edit.setText(molecule["inchi"])
+        self.inchikey_edit.setText(molecule["inchikey"])
+        self.smiles_edit.setText(molecule["smiles"])
+        self.cas_edit.setText(molecule.get("cas") or "")
+        self.compound_names = list(molecule.get("names") or [])
+        for data_uuid in self.app_window.database.get_data_uuids(molecule_uuid):
+            self.data[data_uuid] = self.app_window.database.read_data(molecule_uuid, data_uuid)
+        self.molecule_uuid = molecule_uuid
+        self._update_compound_names()
+        self._update_data()
+        if self.viewer_mode:
+            molecule_image = Draw.MolToImage(Chem.MolFromSmiles(molecule["smiles"]), size=(180, 180))
+            buffer = BytesIO()
+            molecule_image.save(buffer, format="PNG")
+            self.structure_label.setPixmap(QPixmap())
+            pixmap = QPixmap()
+            pixmap.loadFromData(buffer.getvalue())
+            self.structure_label.setPixmap(pixmap)
 
-        for child in self.winfo_children():
-            child.destroy()
+    def _reset_fields(self) -> None:
+        self.inchi_edit.clear()
+        self.inchikey_edit.clear()
+        self.smiles_edit.clear()
+        self.cas_edit.clear()
+        self.compound_names = []
+        self._new_compound_names.clear()
+        self._deleted_compound_names.clear()
+        self.data.clear()
+        self._new_data.clear()
+        self._updated_data.clear()
+        self._deleted_data.clear()
+        self.molecule_uuid = None
 
-        self.search = ttk.Frame(self)
-        self.search_label = ttk.Label(self.search, text="Search: ")
-        self.search_label.grid(column=0, row=0, padx=self.padx, pady=self.pady)
-        self.search_var = tk.StringVar(self)
-        self.search_box = ttk.Entry(self.search, textvariable=self.search_var)
-        self.search_box.grid(column=1, row=0, sticky="ew", padx=self.padx, pady=self.pady)
-        self.search.columnconfigure(1, weight=1)
-        self.search.pack(fill="both", expand=True)
-        self.search_box.bind("<KeyRelease>", lambda _event: self._populate_ui_moleculelist())
+    def _clear(self) -> None:
+        self._reset_fields()
+        self._update_compound_names()
+        self._update_data()
+        if self.previous_tab is not None and self.mode in ("edit", "view"):
+            self.app_window._close_temporary_tab(self)
+        elif self.previous_tab is not None:
+            self.app_window.tabs.setCurrentWidget(self.previous_tab)
 
-        self.scroll_canvas = tk.Canvas(self, highlightthickness=0, borderwidth=0)
-        self.scrollbar = tk.Scrollbar(self, orient="vertical", command=self.scroll_canvas.yview)
-        self.scrollable_frame = tk.Frame(self.scroll_canvas)
-        self.scrollable_frame.bind("<Configure>", lambda _event: self.scroll_canvas.configure(scrollregion=self.scroll_canvas.bbox("all")))
 
-        window_id = self.scroll_canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
-        self.scroll_canvas.bind("<Configure>", lambda e: self.scroll_canvas.itemconfigure(window_id, width=e.width))
-        self.scroll_canvas.configure(yscrollcommand=self.scrollbar.set)
-        self.scroll_canvas.bind_all("<MouseWheel>", _on_mousewheel)
+class Browse(QWidget):
+    def __init__(self, parent: GUI) -> None:
+        super().__init__(parent)
+        self.app_window = parent
+        layout = QVBoxLayout(self)
+        search_row = QHBoxLayout()
+        search_row.addWidget(QLabel("Search:"))
+        self.search_edit = QLineEdit()
+        self.search_edit.setPlaceholderText("Search by compound name or CAS")
+        self.search_edit.textChanged.connect(self.populate)
+        search_row.addWidget(self.search_edit, 1)
+        layout.addLayout(search_row)
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.list_content = QWidget()
+        self.list_layout = QVBoxLayout(self.list_content)
+        self.list_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self.scroll_area.setWidget(self.list_content)
+        layout.addWidget(self.scroll_area, 1)
+        self.populate()
 
-        # added in tcl9.0, but not all platforms have builds for that yet
-        try:
-            self.scroll_canvas.bind_all(
-                "<TouchpadScroll>",
-                _on_touchpad_scroll,
-            )
-        except tk.TclError:
-            pass
-
-        self.scroll_canvas.bind_all("<Button-4>", _on_linux_wheel)
-        self.scroll_canvas.bind_all("<Button-5>", _on_linux_wheel)
-
-        self.scroll_canvas.pack(side="left", fill="both", expand=True)
-        self.scrollbar.pack(side="right", fill="y")
-
-        self.scrollable_frame.columnconfigure(0, weight=1)
-
-        self._populate_ui_moleculelist()
-
-    def _populate_ui_moleculelist(self) -> None:
-        def sort_molecules_by_name(molecules: dict[str, Molecule]) -> dict[str, Molecule]:
-            def _sorter(items: tuple[str, Molecule]) -> Any:
-                trans = str.maketrans(
-                    {
-                        "0": "",
-                        "1": "",
-                        "2": "",
-                        "3": "",
-                        "4": "",
-                        "5": "",
-                        "6": "",
-                        "7": "",
-                        "8": "",
-                        "9": "",
-                        "-": "",
-                        "'": "",
-                        '"': "",
-                        ",": "",
-                    }
-                )
-                if items[1].get("names", []):
-                    name = str(items[1].get("names", [])[0])  # type: ignore
-                    name = name.lower()
-                    name = name.translate(trans)
-                    return name
-                else:
-                    return items[1].get("cas", "")
-
-            return dict(sorted(molecules.items(), key=_sorter))
-
-        def filter_molecules_by_search(molecules: dict[str, Molecule]) -> dict[str, Molecule]:
-            search_term = self.search_var.get().strip().lower()
-            if not search_term:
-                return molecules
-
-            sorted_molecules: dict[str, Molecule] = {}
-            for uu, mol in molecules.items():
-                names = [name.lower() for name in mol.get("names", [])]  # type: ignore
-                cas = mol.get("cas", "")
-                if any(search_term in name for name in [cas, *names]):  # type: ignore
-                    sorted_molecules[uu] = mol
-
-            return sorted_molecules
-
-        for child in self.scrollable_frame.winfo_children():
-            child.destroy()
-
-        molecules: dict[str, Molecule] = sort_molecules_by_name(self.parent.database.by_uuid)
-        molecules = filter_molecules_by_search(molecules)
-
-        for i, (molecule_uuid, molecule) in enumerate(molecules.items()):
-            print(molecule_uuid, molecule)
-            ttk.Label(self.scrollable_frame, text=get_display_name(molecule)).grid(row=i, column=0, padx=self.padx, pady=self.pady, sticky="ew")
-            ttk.Button(
-                self.scrollable_frame,
-                text="View",
-                command=lambda molecule_uuid=molecule_uuid: self._view(molecule_uuid),  # type: ignore
-            ).grid(row=i, column=1, padx=self.padx, pady=self.pady)
-            ttk.Button(
-                self.scrollable_frame,
-                text="Edit",
-                command=lambda molecule_uuid=molecule_uuid: self._edit(molecule_uuid),  # type: ignore
-            ).grid(row=i, column=2, padx=self.padx, pady=self.pady)
-            ttk.Button(
-                self.scrollable_frame,
-                text="Delete",
-                command=lambda molecule_uuid=molecule_uuid: self._delete(molecule_uuid),  # type: ignore
-            ).grid(row=i, column=3, padx=self.padx, pady=self.pady)
+    def populate(self, _text: str = "") -> None:
+        AddMolecule._clear_layout(self.list_layout)
+        term = self.search_edit.text().strip().lower()
+        molecules = sorted(self.app_window.database.by_uuid.items(), key=lambda item: _molecule_sort_key(item[1]))
+        visible = [
+            (molecule_uuid, molecule)
+            for molecule_uuid, molecule in molecules
+            if not term or any(term in value.lower() for value in [molecule.get("cas") or "", *(molecule.get("names") or [])])
+        ]
+        for molecule_uuid, molecule in visible:
+            row = QHBoxLayout()
+            row.addWidget(QLabel(get_display_name(molecule)), 1)
+            for title, action in (
+                ("View", self._view),
+                ("Edit", self._edit),
+                ("Delete", self._delete),
+            ):
+                button = QPushButton(title)
+                button.clicked.connect(lambda _checked=False, key=molecule_uuid, callback=action: callback(key))
+                row.addWidget(button)
+            self.list_layout.addLayout(row)
+        if not visible:
+            self.list_layout.addWidget(QLabel("No molecules found."))
 
     def _view(self, molecule_uuid: str) -> None:
-        self.parent.view_tab.previous_tab = self.parent.browse_tab
-        self.parent.view_tab._update_ui_from_database(molecule_uuid)
-        self.parent._toggle_view_on()
-        self.parent.notebook.select(self.parent.view_tab)
+        self.app_window._open_temporary_tab("view", molecule_uuid)
 
     def _edit(self, molecule_uuid: str) -> None:
-        self.parent.edit_molecule.previous_tab = self.parent.browse_tab
-        self.parent.edit_molecule._update_ui_from_database(molecule_uuid)
-        self.parent._toggle_edit_on()
-        self.parent.notebook.select(self.parent.edit_molecule)
+        self.app_window._open_temporary_tab("edit", molecule_uuid)
 
     def _delete(self, molecule_uuid: str) -> None:
-        print(molecule_uuid)
-        if not self.parent.database.is_this_in_db(uuid=molecule_uuid):
-            messagebox.showerror(
-                title="Can't delete what doesn't exist",
-                message=f"Cannot delete selected molecule {molecule_uuid} because it isn't in the database.",
-            )
+        if not self.app_window.database.is_this_in_db(uuid=molecule_uuid):
+            QMessageBox.warning(self, "Molecule not found", "The selected molecule is no longer in the database.")
             return
-
-        if not messagebox.askyesno(
-            title="Are you sure?",
-            message=f"Are you sure you want to delete this molecule:\n - {molecule_uuid}\n - {self.parent.database.by_uuid[molecule_uuid]}",
-        ):
+        molecule = self.app_window.database.by_uuid[molecule_uuid]
+        confirmation = QMessageBox.question(
+            self,
+            "Delete molecule?",
+            f"Are you sure you want to delete this molecule?\n\n{molecule_uuid}\n{get_display_name(molecule)}",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if confirmation != QMessageBox.StandardButton.Yes:
             return
-
-        if not self.parent.database.delete_entry(uuid=molecule_uuid):
-            messagebox.showerror(
-                title="Deletion unsuccessful",
-                message=f"Could not delete molecule {molecule_uuid} due to an unknown error.",
-            )
-        self.parent.database.__init__()  # type: ignore
-        self._build_ui()
+        if not self.app_window.database.delete_entry(uuid=molecule_uuid):
+            QMessageBox.critical(self, "Deletion failed", f"Could not delete molecule {molecule_uuid}.")
+            return
+        self.app_window.database = Database()
+        self.populate()
 
 
-class GUI(tk.Tk):
-    padx = 5
-    pady = 5
-
-    def __init__(self, root: tk.Tk) -> None:
-        self.root = root
-        self.root.title("Personal Chemical Database")
-        self.root.minsize(800, 0)
-
+class GUI(QMainWindow):
+    def __init__(self) -> None:
+        super().__init__()
+        self.setWindowTitle("Personal Chemical Database")
+        self.setMinimumSize(800, 520)
+        self.resize(1000, 720)
         self.database = Database()
+        self.tabs = QTabWidget()
+        self.setCentralWidget(self.tabs)
 
-        self.notebook = ttk.Notebook(self.root)
-        self.add_molecule = AddMolecule(self.notebook, parent=self, root=self.root)
-        self.edit_molecule = EditMolecule(self.notebook, parent=self, root=self.root)
-        self.browse_tab = Browse(self.notebook, parent=self, root=self.root)
-        self.view_tab = ViewMolecule(self.notebook, parent=self, root=self.root)
+        self.add_molecule = AddMolecule(self, mode="add")
+        self.browse_tab = Browse(self)
+        self.tabs.addTab(self.add_molecule, "Add Molecule")
+        self.tabs.addTab(self.browse_tab, "Browse")
+        self._temporary_tabs: dict[str, AddMolecule] = {}
 
-        self._build_ui()
+    def _open_temporary_tab(self, mode: Literal["edit", "view"], molecule_uuid: str) -> None:
+        tab = self._temporary_tabs.get(mode)
+        if tab is None:
+            tab = AddMolecule(self, mode=mode)
+            self._temporary_tabs[mode] = tab
+        tab.previous_tab = self.browse_tab
+        tab._load_molecule(molecule_uuid)
+        title = "Edit Molecule" if mode == "edit" else "View Molecule"
+        index = self.tabs.indexOf(tab)
+        if index < 0:
+            self.tabs.addTab(tab, title)
+        self.tabs.setCurrentWidget(tab)
 
-    def _build_ui(self) -> None:
-        self.notebook.pack(fill="both", expand=True)
-        self.notebook.add(self.add_molecule, text="Add Molecule")
-        self.notebook.add(self.browse_tab, text="Browse")
-
-    def _toggle_edit_on(self) -> None:
-        self.notebook.add(self.edit_molecule, text="Edit Molecule")
-
-    def _toggle_edit_off(self) -> None:
-        try:
-            self.notebook.hide(self.edit_molecule)
-        except tk.TclError:
-            pass
-
-    def _toggle_view_on(self) -> None:
-        self.notebook.add(self.view_tab, text="View Molecule")
-
-    def _toggle_view_off(self) -> None:
-        try:
-            self.notebook.hide(self.view_tab)
-        except tk.TclError:
-            pass
-
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-
-    root = tk.Tk()
-    style_root(root)
-    configure_ttk_style()
-    GUI(root)
-    tk.mainloop()
+    def _close_temporary_tab(self, tab: AddMolecule) -> None:
+        index = self.tabs.indexOf(tab)
+        if index >= 0:
+            self.tabs.removeTab(index)
+        if tab.previous_tab is not None:
+            self.tabs.setCurrentWidget(tab.previous_tab)
