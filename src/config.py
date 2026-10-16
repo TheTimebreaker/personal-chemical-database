@@ -19,5 +19,5 @@ except FileNotFoundError:
     logging.error("Config file not found at %s , using defaults.", config_path)
     data = {}
 
-db_path = Path(data.get("db_path", pl_dirs.site_data_path)).resolve()
+db_path = Path(data.get("db_path", pl_dirs.user_data_path)).resolve()
 logging.info("Using %s as db directory", db_path)
