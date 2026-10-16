@@ -90,7 +90,15 @@ jobs:
             libx11-6 \
             libxrandr2 \
             libxrender1 \
-            libxext6
+            libxext6 \
+            libxcb-cursor0 \
+            libxcb-xinerama0 \
+            libxcb-icccm4 \
+            libxcb-image0 \
+            libxcb-keysyms1 \
+            libxcb-render-util0 \
+            libxkbcommon-x11-0 \
+            libxcb-xkb1
 
       - parallel:
         - name: Run PyInstaller (Linux)
