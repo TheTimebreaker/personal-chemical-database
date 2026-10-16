@@ -1,8 +1,10 @@
 name: Build
 
 on:
-  release:
-    types: created
+  push:
+    tags:
+      - "v*"
+      - "test*"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -15,10 +17,14 @@ defaults:
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-22.04
             os-label: Linux x86
+
+          - os: macos-15
+            os-label: macOS ARM
 
           - os: windows-2022
             os-label: Windows x86
@@ -26,7 +32,7 @@ jobs:
     name: Build on ${{ matrix.os-label && format(' ({0})', matrix.os-label) }}
     runs-on: ${{ matrix.os }}
     env:
-      BUILD_PREFIX: personal-chemical-database_${{ github.event.release.tag_name }}
+      BUILD_PREFIX: personal-chemical-database_${{ github.ref_name }}
     steps:
       - name: Prepare build (Windows)
         if: runner.os == 'Windows'
@@ -54,9 +60,12 @@ jobs:
           arch=$(uname -m)
           common_path=${dir}/${BUILD_PREFIX}_${os}_${arch}
           artifact_default=${common_path}.tar.gz
-          artifact_portable=${common_path}_portable.tar.gz
-          artifact_appimage=${common_path}.AppImage
-          
+          if [ "${RUNNER_OS}" = macOS ]; then
+              artifact_portable=
+          else
+              artifact_portable=${common_path}_portable.tar.gz
+              artifact_appimage=${common_path}.AppImage
+          fi
           cat <<EOF >>"${GITHUB_ENV}"
           BUILD_ARTIFACT_DEFAULT=${artifact_default}
           ${artifact_portable:+BUILD_ARTIFACT_PORTABLE=${artifact_portable}}
@@ -76,12 +85,22 @@ jobs:
           set -eu
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            libegl1-mesa \
-            libgl1-mesa-glx \
+            libgl1 \
+            libegl1 \
+            libxkbcommon0 \
+            libfontconfig1 \
+            libfreetype6 \
+            libdbus-1-3 \
+            libglib2.0-0 \
             libx11-6 \
-            libxrandr2 \
+            libx11-xcb1 \
+            libxcb1 \
+            libxcb-cursor0 \
+            libxext6 \
             libxrender1 \
-            libxext6
+            libxi6 \
+            libxfixes3 \
+            libxkbcommon-x11-0 \
 
       - parallel:
         - name: Run PyInstaller (Linux)
@@ -98,6 +117,14 @@ jobs:
             uv run --no-managed-python pyinstaller --distpath dist/portable --workpath build/portable scripts/build.spec -- --portable
             echo "PORTABLE_EXE_PATH=./dist/portable/personal-chemical-database" >> "$GITHUB_ENV"
             tar czf "${BUILD_ARTIFACT_PORTABLE}" -C dist/portable personal-chemical-database
+
+        - name: Run PyInstaller (macOS)
+          if: runner.os == 'macOS'
+          run: |
+            uv run --no-managed-python pyinstaller scripts/build.spec
+            echo "REGULAR_EXE_PATH=./dist/Personal-Chemical-Database.app/Contents/MacOS/personal-chemical-database" >> "$GITHUB_ENV"
+            tar czf "${BUILD_ARTIFACT_DEFAULT}" -C dist Personal-Chemical-Database.app
+
 
         - name: Run PyInstaller (Windows)
           if: runner.os == 'Windows'
@@ -132,12 +159,12 @@ jobs:
         - name: Test executable (non-Windows)
           if: runner.os != 'Windows'
           run: |
-            python3 ./tests/test_executable.py $REGULAR_EXE_PATH
+            QT_QPA_PLATFORM=offscreen python3 ./tests/test_executable.py $REGULAR_EXE_PATH
 
         - name: Test executable (non-Windows portable)
           if: runner.os != 'Windows' && env.PORTABLE_EXE_PATH
           run: |
-            python3 ./tests/test_executable.py $PORTABLE_EXE_PATH
+            QT_QPA_PLATFORM=offscreen python3 ./tests/test_executable.py $PORTABLE_EXE_PATH
 
       - name: Compile Linux AppImage
         if: runner.os == 'Linux'
@@ -215,6 +242,7 @@ jobs:
               archive: false
 
   upload:
+    if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
 
@@ -229,7 +257,9 @@ jobs:
           merge-multiple: 'true'
           skip-decompress: 'true'
 
-      - name: Upload build artifacts to release
+      - name: Create release and upload build artifacts
         uses: softprops/action-gh-release@v3
         with:
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
           files: ${{ runner.temp }}/download/*
