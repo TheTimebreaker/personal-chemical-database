@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - "v*"
+      - "test*"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -16,10 +17,14 @@ defaults:
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-22.04
             os-label: Linux x86
+
+          - os: macos-15
+            os-label: macOS ARM
 
           - os: windows-2022
             os-label: Windows x86
@@ -55,9 +60,12 @@ jobs:
           arch=$(uname -m)
           common_path=${dir}/${BUILD_PREFIX}_${os}_${arch}
           artifact_default=${common_path}.tar.gz
-          artifact_portable=${common_path}_portable.tar.gz
-          artifact_appimage=${common_path}.AppImage
-
+          if [ "${RUNNER_OS}" = macOS ]; then
+              artifact_portable=
+          else
+              artifact_portable=${common_path}_portable.tar.gz
+              artifact_appimage=${common_path}.AppImage
+          fi
           cat <<EOF >>"${GITHUB_ENV}"
           BUILD_ARTIFACT_DEFAULT=${artifact_default}
           ${artifact_portable:+BUILD_ARTIFACT_PORTABLE=${artifact_portable}}
@@ -99,6 +107,14 @@ jobs:
             uv run --no-managed-python pyinstaller --distpath dist/portable --workpath build/portable scripts/build.spec -- --portable
             echo "PORTABLE_EXE_PATH=./dist/portable/personal-chemical-database" >> "$GITHUB_ENV"
             tar czf "${BUILD_ARTIFACT_PORTABLE}" -C dist/portable personal-chemical-database
+
+        - name: Run PyInstaller (macOS)
+          if: runner.os == 'macOS'
+          run: |
+            uv run --no-managed-python pyinstaller scripts/build.spec
+            echo "REGULAR_EXE_PATH=./dist/Personal-Chemical-Database.app/Contents/MacOS/personal-chemical-database" >> "$GITHUB_ENV"
+            tar czf "${BUILD_ARTIFACT_DEFAULT}" -C dist Personal-Chemical-Database.app
+
 
         - name: Run PyInstaller (Windows)
           if: runner.os == 'Windows'
@@ -216,6 +232,7 @@ jobs:
               archive: false
 
   upload:
+    if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
 
