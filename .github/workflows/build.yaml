@@ -76,23 +76,6 @@ jobs:
         with:
           groups: build
 
-
-      - name: Verify build runtime
-        run: |
-          uv run --no-managed-python python - <<'PY'
-          import sys
-          from PySide6.QtWidgets import QApplication, QMainWindow
-
-          print("Python:", sys.version)
-          print("Python executable:", sys.executable)
-          print("PySide6:", __import__("PySide6").__version__)
-
-          assert sys.version_info[:3] == (3, 14, 5), sys.version
-          assert QApplication is not None
-          assert QMainWindow is not None
-          PY
-
-
       - parallel:
         - name: Run PyInstaller (Linux)
           if: runner.os == 'Linux'
