@@ -22,7 +22,7 @@ def signal_ready(port: int) -> None:
 def main(ready_port: int | None = None) -> int:
     settings = read_config()
 
-    app = QApplication([sys.argv[0]])
+    app: QApplication = QApplication.instance() or QApplication([sys.argv[0]])  # type: ignore
     app.setApplicationName("Personal Chemical Database")
     configure_app_style(app)
     window = GUI(settings=settings)
