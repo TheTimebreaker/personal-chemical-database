@@ -3,9 +3,6 @@ import logging
 import socket
 import sys
 
-logging.basicConfig(level=logging.INFO)
-
-# ruff: noqa: E402
 from PySide6.QtWidgets import QApplication
 
 from config import read_config
