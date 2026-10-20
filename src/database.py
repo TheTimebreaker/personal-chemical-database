@@ -2,13 +2,12 @@ import json
 import logging
 import uuid as uuid_module
 from collections.abc import Callable
+from pathlib import Path
 from typing import Literal, TypedDict
 
 import pubchempy
 from rdkit import Chem
 from send2trash import send2trash
-
-from config import db_path
 
 
 class Molecule(TypedDict):
@@ -34,7 +33,7 @@ class NMRData(MoleculeData):
 
 
 class Database:
-    def __init__(self) -> None:
+    def __init__(self, db_path: Path) -> None:
         self.db_path = db_path
         self.molecules_path = db_path / "molecules"
         self.molecules_path.mkdir(parents=True, exist_ok=True)

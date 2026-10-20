@@ -5,6 +5,7 @@ import sys
 
 from PySide6.QtWidgets import QApplication
 
+from config import read_config
 from gui import GUI
 from style import configure_app_style
 
@@ -16,10 +17,12 @@ def signal_ready(port: int) -> None:
 
 
 def main(ready_port: int | None = None) -> int:
-    app = QApplication([sys.argv[0]])
+    settings = read_config()
+
+    app: QApplication = QApplication.instance() or QApplication([sys.argv[0]])  # type: ignore
     app.setApplicationName("Personal Chemical Database")
     configure_app_style(app)
-    window = GUI()
+    window = GUI(settings=settings)
     window.show()
     app.processEvents()
     if ready_port is not None:
