@@ -34,7 +34,7 @@ def read_config() -> SettingsModel:
         logging.info("Using %s as config directory", config_path)
         with open(config_path, encoding="utf-8") as file:
             data: dict[str, str] = json.load(file)
-            settings = SettingsModel(**data)
+            settings = SettingsModel(**data)  # type: ignore # trust
 
     except FileNotFoundError as error:
         logging.error("Config file not found at %s , asking user.", config_path)

@@ -30,6 +30,7 @@ from PySide6.QtWidgets import (
 from rdkit import Chem
 from rdkit.Chem import Draw
 
+from config import SettingsModel
 from database import Database, Molecule, MoleculeData, NMRData, generate_molecule_data, get_display_name
 
 DataType = Literal["1H NMR", "13C NMR", "19F NMR", "31P NMR", "IR", "Mass", "boiling point", "melting point", "color"]
@@ -495,7 +496,7 @@ class AddMolecule(QWidget):
             if not self.app_window.database.create_entry(molecule):
                 QMessageBox.critical(self, "Save failed", "The molecule could not be added to the database.")
                 return
-            self.app_window.database = Database()
+            self.app_window.database = Database(self.app_window.settings.db_path)
             saved_molecule_uuid = self.app_window.database.by_inchi[inchi]
         else:
             if self.molecule_uuid is None:
@@ -508,7 +509,7 @@ class AddMolecule(QWidget):
                 return
 
         self._save_data(saved_molecule_uuid)
-        self.app_window.database = Database()
+        self.app_window.database = Database(self.app_window.settings.db_path)
         self.app_window.browse_tab.populate()
         if self.mode == "add":
             self._clear()
@@ -639,17 +640,18 @@ class Browse(QWidget):
         if not self.app_window.database.delete_entry(uuid=molecule_uuid):
             QMessageBox.critical(self, "Deletion failed", f"Could not delete molecule {molecule_uuid}.")
             return
-        self.app_window.database = Database()
+        self.app_window.database = Database(self.app_window.settings.db_path)
         self.populate()
 
 
 class GUI(QMainWindow):
-    def __init__(self) -> None:
+    def __init__(self, settings: SettingsModel) -> None:
         super().__init__()
         self.setWindowTitle("Personal Chemical Database")
         self.setMinimumSize(800, 520)
         self.resize(1000, 720)
-        self.database = Database()
+        self.settings = settings
+        self.database = Database(db_path=settings.db_path)
         self.tabs = QTabWidget()
         self.setCentralWidget(self.tabs)
 

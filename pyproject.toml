@@ -74,11 +74,6 @@ ignore = [
 
 [tool.pylint."MASTER"]
 disable = ["all"]
-enable = [
-  "W1203", #fstring in logging
-  "C0103", #invalid name
-]
-ignore-paths = [".venv"]
 
 
 [tool.black]

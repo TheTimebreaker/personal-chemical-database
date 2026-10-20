@@ -8,6 +8,7 @@ logging.basicConfig(level=logging.INFO)
 # ruff: noqa: E402
 from PySide6.QtWidgets import QApplication
 
+from config import read_config
 from gui import GUI
 from style import configure_app_style
 
@@ -19,10 +20,12 @@ def signal_ready(port: int) -> None:
 
 
 def main(ready_port: int | None = None) -> int:
+    settings = read_config()
+
     app = QApplication([sys.argv[0]])
     app.setApplicationName("Personal Chemical Database")
     configure_app_style(app)
-    window = GUI()
+    window = GUI(settings=settings)
     window.show()
     app.processEvents()
     if ready_port is not None:
