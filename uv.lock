@@ -125,6 +125,19 @@ wheels = [
 ]
 
 [[package]]
+name = "jactionlint"
+version = "2.2.0"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/4b/8f/4d66056f9d7f3cc79504424dbf8e1f191c88f456bef72844572c97af2ddc/jactionlint-2.2.0-py3-none-macosx_10_9_x86_64.whl", hash = "sha256:2da1fe02c67c72e1bc1dd799578a27596323ef5f734845c9131671a5db411782", size = 17632706, upload-time = "2026-10-14T15:55:12.783Z" },
+    { url = "https://files.pythonhosted.org/packages/f5/03/b2d6402adc765c1e826b30210ca7e691e4dbde5c35a537caf883c75c487b/jactionlint-2.2.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:c9f064198199081cc1c7bab1d09675563df35299926aca60b6d32d99e7252e1b", size = 16411955, upload-time = "2026-10-14T15:55:15.841Z" },
+    { url = "https://files.pythonhosted.org/packages/e6/e4/7d374fa368ded644317f9ea5fcbbdadffb02e49592b46c9225495ea27f49/jactionlint-2.2.0-py3-none-manylinux_2_17_aarch64.whl", hash = "sha256:caf4625794fdf1877d2b3843cff20bc7d6d29e1fc7bb68e8194d3810b7b6e671", size = 15997783, upload-time = "2026-10-14T15:55:18.79Z" },
+    { url = "https://files.pythonhosted.org/packages/a5/81/7ce5f912850a592ad38aab0f4806a925a59204e114f613e716892aac802e/jactionlint-2.2.0-py3-none-manylinux_2_17_x86_64.whl", hash = "sha256:4aafae7fc2b5901d77bb6c7777236311a136d76f329af6f10c5c21453b582bd7", size = 17312598, upload-time = "2026-10-14T15:55:22.137Z" },
+    { url = "https://files.pythonhosted.org/packages/ee/c2/d39e76936b07600876f37d38700e27d6d12729f3f626bacdd77e7f1de686/jactionlint-2.2.0-py3-none-win_amd64.whl", hash = "sha256:93da04a956690dd36bd6a5b2028eeec8d2db506af51560ac3d67c3546a5ded9d", size = 17817782, upload-time = "2026-10-14T15:55:25.57Z" },
+    { url = "https://files.pythonhosted.org/packages/35/0b/83b3fd62e1d97c428ab1d234e2581ec9dcfaaf09391d1009a8d917811dfa/jactionlint-2.2.0-py3-none-win_arm64.whl", hash = "sha256:027d5c6426c97a1a72b03e2f3ae5693bccb6798979496d260e15829a33559828", size = 16277171, upload-time = "2026-10-14T15:55:28.637Z" },
+]
+
+[[package]]
 name = "librt"
 version = "0.15.0"
 source = { registry = "https://pypi.org/simple" }
@@ -376,6 +389,7 @@ build = [
 ]
 dev = [
     { name = "black" },
+    { name = "jactionlint" },
     { name = "mypy" },
     { name = "pyinstaller" },
     { name = "ruff" },
@@ -397,6 +411,7 @@ requires-dist = [
 build = [{ name = "pyinstaller" }]
 dev = [
     { name = "black", specifier = "~=26.5.1" },
+    { name = "jactionlint", specifier = ">=2.2.0" },
     { name = "mypy", specifier = "~=2.1.0" },
     { name = "pyinstaller" },
     { name = "ruff", specifier = "~=0.15.17" },

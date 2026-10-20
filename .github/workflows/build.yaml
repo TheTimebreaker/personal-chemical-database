@@ -5,6 +5,7 @@ on:
     tags:
       - "v*"
       - "test*"
+  pull_request:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -16,6 +17,7 @@ defaults:
 
 jobs:
   build:
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -32,7 +34,7 @@ jobs:
     name: Build on ${{ matrix.os-label && format(' ({0})', matrix.os-label) }}
     runs-on: ${{ matrix.os }}
     env:
-      BUILD_PREFIX: personal-chemical-database_${{ github.ref_name }}
+      BUILD_PREFIX: personal-chemical-database_${{ github.event_name == 'pull_request' && format('test-pr-{0}', github.event.number) || github.ref_name }}
     steps:
       - name: Prepare build (Windows)
         if: runner.os == 'Windows'

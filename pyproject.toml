@@ -22,6 +22,7 @@ dev = [
     "pyinstaller",
     "types-send2trash>=2.1.0.20260408",
     "types-pyinstaller>=6.22.1.20260827",
+    "jactionlint>=2.2.0",
 ]
 build = [
     "pyinstaller",
