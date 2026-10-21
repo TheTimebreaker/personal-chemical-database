@@ -16,8 +16,8 @@ def signal_ready(port: int) -> None:
         sock.sendall(b"READY")
 
 
-def main(ready_port: int | None = None) -> int:
-    settings = read_config()
+def main(ready_port: int | None = None, use_default_config: bool = False) -> int:
+    settings = read_config(use_default_config)
 
     app: QApplication = QApplication.instance() or QApplication([sys.argv[0]])  # type: ignore
     app.setApplicationName("Personal Chemical Database")
@@ -35,5 +35,10 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--ready-port", type=int)
+    parser.add_argument(
+        "--use-default-config",
+        action="store_true",
+        help="Use a temporary empty database and skip the config prompt (for plain testing if the application starts).",
+    )
     args = parser.parse_args()
-    sys.exit(main(args.ready_port))
+    sys.exit(main(args.ready_port, args.use_default_config))

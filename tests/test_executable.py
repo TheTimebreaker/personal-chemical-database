@@ -123,6 +123,7 @@ def main() -> int:
                 executable_path,
                 "--ready-port",
                 str(port),
+                "--use-default-config",
             ],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,

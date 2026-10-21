@@ -28,7 +28,12 @@ def save_config(settings: SettingsModel) -> None:
         file.write(data)
 
 
-def read_config() -> SettingsModel:
+def read_config(use_default_config: bool = False) -> SettingsModel:
+    if use_default_config:
+        settings = SettingsModel(db_path=platformdirs.PlatformDirs("personal-chemical-database", "TheTimebreaker").user_data_path)
+        logging.info("Using default config because requested: %s", settings)
+        return settings
+
     config_path = get_config_path()
     try:
         logging.info("Using %s as config directory", config_path)
