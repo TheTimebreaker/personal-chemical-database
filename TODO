@@ -1,3 +1,14 @@
+Change github builds; so that the compilation finishing is ONE job; add it to PR requirements
+Add action that runs `make test`
+
+
+
 toggleable dark mode
 
-Add action that runs `make test`
+
+
+versions in AppImages?
+About tab in app
+icon in non-compiled builds
+
+auto-delete old test tags
