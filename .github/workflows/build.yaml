@@ -78,6 +78,8 @@ jobs:
           EOF
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v 7.0.1
+        with:
+          persist-credentials: false
 
       - name: Setup Python
         uses: ./.github/actions/setup-python
@@ -264,11 +266,14 @@ jobs:
           skip-decompress: 'true'
 
       - name: Create release and upload build artifacts
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
-        with:
-          tag_name: ${{ github.ref_name }}
-          generate_release_notes: true
-          files: ${{ runner.temp }}/download/*
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+          DOWNLOAD_DIR: ${{ runner.temp }}/download
+        run: |
+          gh release create "$TAG_NAME" \
+            "$DOWNLOAD_DIR"/* \
+            --generate-notes
 
   build-successfull:
     name: Build Successful?
