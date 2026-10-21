@@ -161,12 +161,12 @@ jobs:
         - name: Test executable (non-Windows)
           if: runner.os != 'Windows'
           run: |
-            QT_QPA_PLATFORM=offscreen python3 ./tests/test_executable.py $REGULAR_EXE_PATH
+            QT_QPA_PLATFORM=offscreen python3 ./tests/test_executable.py "$REGULAR_EXE_PATH"
 
         - name: Test executable (non-Windows portable)
           if: runner.os != 'Windows' && env.PORTABLE_EXE_PATH
           run: |
-            QT_QPA_PLATFORM=offscreen python3 ./tests/test_executable.py $PORTABLE_EXE_PATH
+            QT_QPA_PLATFORM=offscreen python3 ./tests/test_executable.py "$PORTABLE_EXE_PATH"
 
       - name: Compile Linux AppImage
         if: runner.os == 'Linux'
@@ -273,7 +273,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          if [[ "${{ needs.build.result }}" != "success" ]]; then
+          if [ "${{ needs.build.result }}" != "success" ]; then
             echo "One or more test matrix jobs failed."
             exit 1
           fi
