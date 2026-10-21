@@ -265,3 +265,15 @@ jobs:
           tag_name: ${{ github.ref_name }}
           generate_release_notes: true
           files: ${{ runner.temp }}/download/*
+
+  build-successfull:
+    name: Build Successful?
+    needs: [build, upload]
+    if: always() && needs.build.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          if [[ "${{ needs.build.result }}" != "success" ]]; then
+            echo "One or more test matrix jobs failed."
+            exit 1
+          fi
