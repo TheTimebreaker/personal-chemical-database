@@ -175,6 +175,9 @@ jobs:
 
       - name: Compile Linux AppImage
         if: runner.os == 'Linux'
+        # jactionlint ignore=unverified-download
+          # The upstream continuous build has no stable checksum to pin.
+          # Revisit if upstream publishes verifiable checksums or attestations.
         run: |
           set -eu
 
@@ -187,9 +190,8 @@ jobs:
           cp ./img/icon-linux.png "$APPIMAGE_DIR/$APP_NAME.png"
 
           APPIMAGETOOL="${RUNNER_TEMP}/appimagetool-x86_64.AppImage"
-          curl -fsSL \
-            -o "$APPIMAGETOOL" \
-            "https://github.com/AppImage/appimagetool/releases/latest/download/appimagetool-x86_64.AppImage"
+          APPIMAGETOOL_URL="https://github.com/AppImage/appimagetool/releases/latest/download/appimagetool-x86_64.AppImage"
+          curl -fsSL -o "$APPIMAGETOOL" "$APPIMAGETOOL_URL" 
           chmod +x "$APPIMAGETOOL"
           
 
