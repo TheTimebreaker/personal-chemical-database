@@ -1,8 +1,3 @@
-Change github builds; so that the compilation finishing is ONE job; add it to PR requirements
-Add action that runs `make test`
-
-
-
 toggleable dark mode
 
 
