@@ -24,16 +24,18 @@ elif system == "Darwin":
     ICON = (Path(".") / "img" / "icon-Mac.icns").resolve()
 else:  # Linux doesn't use built-into-EXE icons
     ICON = None
-    
+
 try:
-    VERSION = subprocess.check_output(
-        ["git", "describe", "--tags", "--abbrev=0"],
-        stderr=subprocess.DEVNULL,
-    ).decode().strip()
+    VERSION = (
+        subprocess.check_output(
+            ["git", "describe", "--tags", "--abbrev=0"],
+            stderr=subprocess.DEVNULL,
+        )
+        .decode()
+        .strip()
+    )
 except subprocess.CalledProcessError:
-    VERSION = "dev-" + subprocess.check_output(
-        ["git", "rev-parse", "--short", "HEAD"]
-    ).decode().strip()
+    VERSION = "dev-" + subprocess.check_output(["git", "rev-parse", "--short", "HEAD"]).decode().strip()
 
 if not VERSION:
     raise ValueError("extracted git version was false, thats illegal.")
