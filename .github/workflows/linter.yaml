@@ -1,0 +1,38 @@
+name: Linters
+
+on:
+  push:
+    tags:
+      - "v*"
+      - "test*"
+  pull_request:
+
+defaults:
+  run:
+    shell: sh
+
+jobs:
+  linter:
+    timeout-minutes: 15
+    name: Run all the linters
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Python
+        uses: ./.github/actions/setup-python
+        with:
+          groups: dev
+
+      - name: Run ruff
+        run: uv run ruff check .
+
+      - name: Run black
+        run: uv run black --check .
+
+      - name: Run mypy
+        run: uv run mypy .
+
+      - name: Run jactionlint
+        run: uv run jactionlint --profile correctness
