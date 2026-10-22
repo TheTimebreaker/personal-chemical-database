@@ -1,7 +1,7 @@
 import json
 import logging
+from enum import StrEnum
 from pathlib import Path
-from typing import Literal
 
 import platformdirs
 from pydantic import BaseModel
@@ -11,9 +11,17 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
 
 
+class Theme(StrEnum):
+    """This enum lets you define a theme for the application."""
+
+    SYSTEM = "Automatic"
+    LIGHT = "Light Mode"
+    DARK = "Dark Mode"
+
+
 class SettingsModel(BaseModel):
     db_path: Path
-    theme: Literal["dark", "light", "automatic"] = "automatic"
+    theme: Theme = Theme.SYSTEM
 
 
 def get_config_path() -> Path:

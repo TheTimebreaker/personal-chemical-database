@@ -30,8 +30,9 @@ from PySide6.QtWidgets import (
 from rdkit import Chem
 from rdkit.Chem import Draw
 
-from config import SettingsModel
+from config import SettingsModel, Theme, save_config
 from database import Database, Molecule, MoleculeData, NMRData, generate_molecule_data, get_display_name
+from style import configure_app_style
 
 DataType = Literal["1H NMR", "13C NMR", "19F NMR", "31P NMR", "IR", "Mass", "boiling point", "melting point", "color"]
 NMRType = Literal["1H NMR", "13C NMR", "19F NMR", "31P NMR"]
@@ -645,13 +646,25 @@ class Browse(QWidget):
 
 
 class GUI(QMainWindow):
-    def __init__(self, settings: SettingsModel) -> None:
+    def __init__(self, app: QApplication, settings: SettingsModel) -> None:
         super().__init__()
+        self.app = app
         self.setWindowTitle("Personal Chemical Database")
         self.setMinimumSize(800, 520)
         self.resize(1000, 720)
         self.settings = settings
-        self.database = Database(db_path=settings.db_path)
+
+        menu_bar = self.menuBar()
+        config_menu = menu_bar.addMenu("Config")
+        config_menu_darkmode = config_menu.addAction("Change theme")
+        config_menu_darkmode.triggered.connect(self._change_theme)
+
+        help_menu = menu_bar.addMenu("Help")
+        help_menu_about = help_menu.addAction("About")
+        help_menu_bugreport = help_menu.addAction("Report a bug")
+        help_menu_updates = help_menu.addAction("Check for updates")
+
+        self.database = Database(db_path=self.settings.db_path)
         self.tabs = QTabWidget()
         self.setCentralWidget(self.tabs)
 
@@ -660,6 +673,16 @@ class GUI(QMainWindow):
         self.tabs.addTab(self.add_molecule, "Add Molecule")
         self.tabs.addTab(self.browse_tab, "Browse")
         self._temporary_tabs: dict[str, AddMolecule] = {}
+
+    def _change_theme(self) -> None:
+        themes = list(Theme)
+        theme_labels = [theme.value for theme in themes]
+        theme, accepted = QInputDialog.getItem(self, "Select theme", "Theme:", theme_labels, themes.index(self.settings.theme), False)
+        if accepted:
+            selected_theme = Theme(theme)
+            self.settings.theme = selected_theme
+            configure_app_style(self.app, self.settings)
+            save_config(self.settings)
 
     def _open_temporary_tab(self, mode: Literal["edit", "view"], molecule_uuid: str) -> None:
         tab = self._temporary_tabs.get(mode)
