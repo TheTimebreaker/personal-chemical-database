@@ -21,7 +21,7 @@ def main(ready_port: int | None = None, use_default_config: bool = False) -> int
 
     app: QApplication = QApplication.instance() or QApplication([sys.argv[0]])  # type: ignore
     app.setApplicationName("Personal Chemical Database")
-    configure_app_style(app)
+    configure_app_style(app, settings)
     window = GUI(settings=settings)
     window.show()
     app.processEvents()

@@ -1,6 +1,7 @@
 import json
 import logging
 from pathlib import Path
+from typing import Literal
 
 import platformdirs
 from pydantic import BaseModel
@@ -12,6 +13,7 @@ if __name__ == "__main__":
 
 class SettingsModel(BaseModel):
     db_path: Path
+    theme: Literal["dark", "light", "automatic"] = "automatic"
 
 
 def get_config_path() -> Path:
