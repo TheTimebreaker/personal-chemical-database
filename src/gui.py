@@ -661,6 +661,7 @@ class GUI(QMainWindow):
 
         help_menu = menu_bar.addMenu("Help")
         help_menu_about = help_menu.addAction("About")
+        help_menu_about.triggered.connect(self._about)
         help_menu_bugreport = help_menu.addAction("Report a bug")
         help_menu_updates = help_menu.addAction("Check for updates")
 
@@ -683,6 +684,13 @@ class GUI(QMainWindow):
             self.settings.theme = selected_theme
             configure_app_style(self.app, self.settings)
             save_config(self.settings)
+
+    def _about(self) -> None:
+        msg = QMessageBox(self)
+        msg.setWindowTitle("Information")
+        msg.setText("This is a small info box.")
+        msg.setIcon(QMessageBox.Icon.Information)
+        msg.exec()
 
     def _open_temporary_tab(self, mode: Literal["edit", "view"], molecule_uuid: str) -> None:
         tab = self._temporary_tabs.get(mode)
