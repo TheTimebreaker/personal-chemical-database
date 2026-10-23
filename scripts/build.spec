@@ -7,6 +7,7 @@ from tomllib import load
 from PyInstaller.building.api import COLLECT, EXE, PYZ
 from PyInstaller.building.build_main import Analysis
 from PyInstaller.building.osx import BUNDLE
+from PyInstaller.utils.hooks import copy_metadata
 
 # Parsing the "portable" arg
 parser = argparse.ArgumentParser()
@@ -44,7 +45,7 @@ a = Analysis(
     ["../src/main.py"],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=copy_metadata("personal-chemical-database"),
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

@@ -662,8 +662,8 @@ class GUI(QMainWindow):
         help_menu = menu_bar.addMenu("Help")
         help_menu_about = help_menu.addAction("About")
         help_menu_about.triggered.connect(self._about)
-        help_menu_bugreport = help_menu.addAction("Report a bug")
-        help_menu_updates = help_menu.addAction("Check for updates")
+        help_menu_bugreport = help_menu.addAction("Report a bug")  # noqa: F841
+        help_menu_updates = help_menu.addAction("Check for updates")  # noqa: F841
 
         self.database = Database(db_path=self.settings.db_path)
         self.tabs = QTabWidget()
