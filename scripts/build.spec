@@ -42,8 +42,9 @@ if not VERSION:
     raise ValueError("extracted git version was false, thats illegal.")
 
 a = Analysis(
-    ["../src/main.py"],
-    pathex=[],
+    ["../src/launcher.py"],
+    pathex=["../src"],
+    hex=[],
     binaries=[],
     datas=copy_metadata("personal-chemical-database"),
     hiddenimports=[],
