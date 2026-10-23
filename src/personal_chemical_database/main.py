@@ -2,11 +2,10 @@ import argparse
 import logging
 import socket
 import sys
-from importlib.metadata import version
 
-from packaging.version import Version
 from PySide6.QtWidgets import QApplication
 
+from .__version__ import __version__
 from .config import read_config
 from .gui import GUI
 from .style import configure_app_style
@@ -19,6 +18,10 @@ def signal_ready(port: int) -> None:
 
 
 def main(ready_port: int | None = None, use_default_config: bool = False) -> int:
+    print("Personal Chemical Database")
+    print(f"v{__version__}")
+    print("=" * 20)
+
     logging.basicConfig(level=logging.INFO)
 
     parser = argparse.ArgumentParser()
@@ -29,9 +32,6 @@ def main(ready_port: int | None = None, use_default_config: bool = False) -> int
         help="Use a temporary empty database and skip the config prompt (for plain testing if the application starts).",
     )
     args = parser.parse_args()
-
-    app_version = Version(version("personal-chemical-database"))
-    print(f"{app_version=}")
 
     ready_port = args.ready_port
     use_default_config = args.use_default_config
