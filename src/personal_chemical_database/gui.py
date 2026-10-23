@@ -30,9 +30,9 @@ from PySide6.QtWidgets import (
 from rdkit import Chem
 from rdkit.Chem import Draw
 
-from config import SettingsModel, Theme, save_config
-from database import Database, Molecule, MoleculeData, NMRData, generate_molecule_data, get_display_name
-from style import configure_app_style
+from .config import SettingsModel, Theme, save_config
+from .database import Database, Molecule, MoleculeData, NMRData, generate_molecule_data, get_display_name
+from .style import configure_app_style
 
 DataType = Literal["1H NMR", "13C NMR", "19F NMR", "31P NMR", "IR", "Mass", "boiling point", "melting point", "color"]
 NMRType = Literal["1H NMR", "13C NMR", "19F NMR", "31P NMR"]

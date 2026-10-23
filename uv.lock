@@ -373,7 +373,7 @@ wheels = [
 [[package]]
 name = "personal-chemical-database"
 version = "2.1.2"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "platformdirs" },
     { name = "pubchempy" },

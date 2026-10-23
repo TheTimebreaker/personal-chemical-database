@@ -1,7 +1,7 @@
 from PySide6.QtGui import QFont, Qt
 from PySide6.QtWidgets import QApplication
 
-from config import SettingsModel, Theme
+from .config import SettingsModel, Theme
 
 
 def configure_app_style(app: QApplication, settings: SettingsModel) -> None:
