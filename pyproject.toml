@@ -1,6 +1,6 @@
 [project]
 name="personal-chemical-database"
-version="2.1.2"
+version="2.2.0"
 description="A personal, self-hosted database format and GUI for organizing your own data"
 authors=[{name="TheTimebreaker"}]
 readme="README.md"
