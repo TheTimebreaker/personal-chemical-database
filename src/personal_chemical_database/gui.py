@@ -6,7 +6,8 @@ from io import BytesIO
 from typing import Literal, cast, override
 
 import pubchempy
-from PySide6.QtCore import Qt, Signal
+from packaging.version import Version
+from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QMouseEvent, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
@@ -30,8 +31,11 @@ from PySide6.QtWidgets import (
 from rdkit import Chem
 from rdkit.Chem import Draw
 
-from config import SettingsModel
-from database import Database, Molecule, MoleculeData, NMRData, generate_molecule_data, get_display_name
+from .__version__ import __version__
+from .config import SettingsModel, Theme, save_config
+from .database import Database, Molecule, MoleculeData, NMRData, generate_molecule_data, get_display_name
+from .get_latest_release import Release, get_latest_release
+from .style import configure_app_style
 
 DataType = Literal["1H NMR", "13C NMR", "19F NMR", "31P NMR", "IR", "Mass", "boiling point", "melting point", "color"]
 NMRType = Literal["1H NMR", "13C NMR", "19F NMR", "31P NMR"]
@@ -42,6 +46,13 @@ NMR_TYPES: tuple[NMRType, ...] = ("1H NMR", "13C NMR", "19F NMR", "31P NMR")
 def _molecule_sort_key(molecule: Molecule) -> str:
     name = get_display_name(molecule).lower()
     return name.translate(str.maketrans("", "", "0123456789-'\","))
+
+
+class ReleaseCheckWorker(QThread):
+    finished_check = Signal(object)
+
+    def run(self) -> None:
+        self.finished_check.emit(get_latest_release())
 
 
 class ClickableLabel(QLabel):
@@ -645,13 +656,28 @@ class Browse(QWidget):
 
 
 class GUI(QMainWindow):
-    def __init__(self, settings: SettingsModel) -> None:
+    def __init__(self, app: QApplication, settings: SettingsModel) -> None:
         super().__init__()
+        self.app = app
         self.setWindowTitle("Personal Chemical Database")
         self.setMinimumSize(800, 520)
         self.resize(1000, 720)
         self.settings = settings
-        self.database = Database(db_path=settings.db_path)
+
+        menu_bar = self.menuBar()
+        config_menu = menu_bar.addMenu("Config")
+        config_menu_darkmode = config_menu.addAction("Change theme")
+        config_menu_darkmode.triggered.connect(self._change_theme)
+
+        help_menu = menu_bar.addMenu("Help")
+        help_menu_about = help_menu.addAction("About")
+        help_menu_about.triggered.connect(self._about)
+        help_menu_bugreport = help_menu.addAction("Report a bug")
+        help_menu_bugreport.triggered.connect(self._bug)
+        help_menu_updates = help_menu.addAction("Check for updates")
+        help_menu_updates.triggered.connect(self._updatecheck)
+
+        self.database = Database(db_path=self.settings.db_path)
         self.tabs = QTabWidget()
         self.setCentralWidget(self.tabs)
 
@@ -660,6 +686,82 @@ class GUI(QMainWindow):
         self.tabs.addTab(self.add_molecule, "Add Molecule")
         self.tabs.addTab(self.browse_tab, "Browse")
         self._temporary_tabs: dict[str, AddMolecule] = {}
+
+    def _change_theme(self) -> None:
+        themes = list(Theme)
+        theme_labels = [theme.value for theme in themes]
+        theme, accepted = QInputDialog.getItem(self, "Select theme", "Theme:", theme_labels, themes.index(self.settings.theme), False)
+        if accepted:
+            selected_theme = Theme(theme)
+            self.settings.theme = selected_theme
+            configure_app_style(self.app, self.settings)
+            save_config(self.settings)
+
+    def _about(self) -> None:
+        msg = QMessageBox(self)
+        msg.setWindowTitle("About")
+        msg.setTextFormat(Qt.TextFormat.RichText)
+        msg.setText(
+            f"Personal Chemical Database - v{__version__}<br><br>"
+            "A fully local chemical database, for easily storing and finding "
+            "only the data that you actually need.<br><br>"
+            '<a href="https://github.com/TheTimebreaker/personal-chemical-database">'
+            "GitHub project page</a>"
+        )
+        msg.setIcon(QMessageBox.Icon.Information)
+        msg.exec()
+
+    def _bug(self) -> None:
+        msg = QMessageBox(self)
+        msg.setWindowTitle("Submit a bug report")
+        msg.setTextFormat(Qt.TextFormat.RichText)
+        msg.setText(
+            f"Personal Chemical Database - v{__version__}<br><br>"
+            "If you have encountered a bug, unexpected behavior have a feature request that you want to let us know about, "
+            "feel free to create a report under the link below.<br><br>"
+            '<a href="https://github.com/TheTimebreaker/personal-chemical-database/issues">'
+            "Create a bug report or suggest a new feature</a>"
+        )
+        msg.setIcon(QMessageBox.Icon.Information)
+        msg.exec()
+
+    def _updatecheck(self) -> None:
+        self.msg = QMessageBox(self)
+        self.msg.setWindowTitle("Update checker")
+        self.msg.setText("Please wait while checking for updates...")
+        self.msg.setIcon(QMessageBox.Icon.Information)
+        self.msg.setStandardButtons(QMessageBox.StandardButton.NoButton)
+        self.msg.show()
+
+        self.worker = ReleaseCheckWorker(self)
+        self.worker.finished_check.connect(self._on_release_checked)
+        self.worker.start()
+
+    def _on_release_checked(self, release: Release) -> None:
+        if release is None:
+            text = (
+                "Something went wrong while trying to check for the latest release.\n"
+                "Check your internet connection and whether GitHub is online "
+                "and then try again (maybe later)."
+            )
+            icon = QMessageBox.Icon.Warning
+        elif Version(release.version) == __version__:
+            text = "You are already up-to-date. No newer version has been released."
+            icon = QMessageBox.Icon.Information
+        elif Version(release.version) > __version__:
+            text = f"There is a newer version released.<br>" f'<a href="{release.url}">Go to the release page.</a>'  # noqa: ISC001
+            icon = QMessageBox.Icon.Information
+        else:
+            self.msg.close()
+            self.worker.deleteLater()
+            return
+
+        self.msg.setWindowTitle("Update checker")
+        self.msg.setText(text)
+        self.msg.setIcon(icon)
+        self.msg.setStandardButtons(QMessageBox.StandardButton.Ok)
+
+        self.worker.deleteLater()
 
     def _open_temporary_tab(self, mode: Literal["edit", "view"], molecule_uuid: str) -> None:
         tab = self._temporary_tabs.get(mode)

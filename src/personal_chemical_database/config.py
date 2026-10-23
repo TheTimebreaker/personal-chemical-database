@@ -1,5 +1,6 @@
 import json
 import logging
+from enum import StrEnum
 from pathlib import Path
 
 import platformdirs
@@ -10,8 +11,17 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
 
 
+class Theme(StrEnum):
+    """This enum lets you define a theme for the application."""
+
+    SYSTEM = "Automatic"
+    LIGHT = "Light Mode"
+    DARK = "Dark Mode"
+
+
 class SettingsModel(BaseModel):
     db_path: Path
+    theme: Theme = Theme.SYSTEM
 
 
 def get_config_path() -> Path:
