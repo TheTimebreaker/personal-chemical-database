@@ -184,7 +184,7 @@ jobs:
           APP_NAME="personal-chemical-database"
           APP_DIR="$REGULAR_EXE_DIR"
           APPIMAGE_DIR="$RUNNER_TEMP/${APP_NAME}.AppDir"
-          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
               APP_VERSION="$GITHUB_REF_NAME"
           else
               COMMIT_HASH="$(git rev-parse --short HEAD)"
