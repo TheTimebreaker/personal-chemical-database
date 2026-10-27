@@ -220,6 +220,8 @@ jobs:
           Type=Application
           Categories=Utility;
           Icon=$APP_NAME
+          X-AppImage-Name=$APP_NAME
+          X-AppImage-Version=$APP_VERSION
           EOF
 
           echo "=== Desktop file ==="
