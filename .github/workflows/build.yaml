@@ -184,10 +184,17 @@ jobs:
           APP_NAME="personal-chemical-database"
           APP_DIR="$REGULAR_EXE_DIR"
           APPIMAGE_DIR="$RUNNER_TEMP/${APP_NAME}.AppDir"
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+              APP_VERSION="$GITHUB_REF_NAME"
+          else
+              COMMIT_HASH="$(git rev-parse --short HEAD)"
+              APP_VERSION="dev-${COMMIT_HASH}"
+          fi
 
           mkdir -p "$APPIMAGE_DIR/usr/bin/$APP_NAME"
           cp -a "$APP_DIR/." "$APPIMAGE_DIR/usr/bin/$APP_NAME/"
           cp ./img/icon-linux.png "$APPIMAGE_DIR/$APP_NAME.png"
+          echo "$APP_VERSION" > "$APPIMAGE_DIR/VERSION"
 
           APPIMAGETOOL="${RUNNER_TEMP}/appimagetool-x86_64.AppImage"
           APPIMAGETOOL_URL="https://github.com/AppImage/appimagetool/releases/latest/download/appimagetool-x86_64.AppImage"
@@ -213,6 +220,8 @@ jobs:
           Type=Application
           Categories=Utility;
           Icon=$APP_NAME
+          X-AppImage-Name=$APP_NAME
+          X-AppImage-Version=$APP_VERSION
           EOF
 
           echo "=== Desktop file ==="
