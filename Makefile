@@ -6,3 +6,6 @@ test:
 
 run:
 	uv run python -m personal_chemical_database
+
+cleantags:
+	git fetch --prune --prune-tags origin
