@@ -1,0 +1,39 @@
+
+name: Cleanup old test tags
+
+on:
+  schedule:
+    - cron: '11 5 * * *'  # Daily at 05:11 UTC
+  workflow_dispatch:      # Allow manual execution
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Delete test tagsdays
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cutoff=$(date -u -d '7 days ago' +%s)
+
+          while read -r tag created; do
+            [[ "$created" =~ ^[0-9]+$ ]] || continue
+
+            if (( created < cutoff )); then
+              echo "Deleting expired tag: $tag"
+              git push origin --delete "refs/tags/$tag"
+            fi
+          done < <(
+            git for-each-ref \
+              --format='%(refname:short) %(creatordate:unix)' \
+              'refs/tags/test*'
+          )
